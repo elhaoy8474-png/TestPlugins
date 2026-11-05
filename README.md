@@ -1,4 +1,4 @@
-**⚠️1 This is currently under development, dont use it yet if you're not comfortable with constantly merging new changes**
+**⚠️This is currently under development, dont use it yet if you're not comfortable with constantly merging new changes**
 
 # `Cloudstream3 Plugin Repo Template`
 
@@ -55,4 +55,4 @@ Everything in this repo is released into the public domain. You may use it howev
 ## Attribution
 
 This template as well as the gradle plugin and the whole plugin system is **heavily** based on [Aliucord](https://github.com/Aliucord).
-*Go use it, it's a great mobile discord client mod!*
+*Go use it, it's a great mobile discord client nk mod!*
