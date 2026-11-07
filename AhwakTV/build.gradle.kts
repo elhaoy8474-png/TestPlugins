@@ -8,3 +8,4 @@ cloudstream {
     tvTypes = listOf("Movie", "TvSeries")
     iconUrl = "https://aahwaktv.beer/favicons/android-icon-192x192.png"
 }
+ 
