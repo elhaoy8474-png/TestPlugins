@@ -80,7 +80,7 @@ class AhwakTV : MainAPI() {
         if (episodeLinks.isNotEmpty()) {
             val episodes = episodeLinks.mapIndexed { index, element ->
                 val episodeTitle = element.attr("title").ifBlank { element.text() }.trim()
-                    .ifBlank { "الحلقة \${index + 1}" }
+                    .ifBlank { "الحلقة ${index + 1}" }
                 val number = Regex("(\\d+)").find(episodeTitle)?.groupValues?.getOrNull(1)?.toIntOrNull()
                 newEpisode(data = playerUrl(fixUrl(element.attr("href")))) {
                     name = episodeTitle
