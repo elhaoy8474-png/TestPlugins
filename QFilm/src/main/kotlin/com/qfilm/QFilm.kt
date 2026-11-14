@@ -68,8 +68,8 @@ class QFilm : MainAPI() {
             val seriesTitle = title.replace(Regex("(?i)\\s*(الموسم\\s*\\d+\\s*)?الحلقة.*$"), "").
                 replace(Regex("(?i)\\s*(season\\s*\\d+\\s*)?episode.*$"), "").trim()
             if (seriesTitle.isBlank()) return@forEach
-            val image = a.selectFirst("img") ?: a.parent()?.selectFirst("img")
-            val poster = image?.let { it.attr("data-src").ifBlank { it.attr("src") } }
+            val image: Element? = a.selectFirst("img") ?: a.parent()?.selectFirst("img")
+            val poster: String? = image?.let { it.attr("data-src").ifBlank { it.attr("src") } }
                 ?.takeIf { it.isNotBlank() }?.let { try { URI("https://a.qfilm.cam").resolve(it).toString() } catch (_: Exception) { it } }
             val absolute = try { URI("https://a.qfilm.cam").resolve(href).toString() } catch (_: Exception) { href }
             results.putIfAbsent(seriesTitle.lowercase(), newTvSeriesSearchResponse(seriesTitle, absolute, TvType.TvSeries) { posterUrl = poster })
