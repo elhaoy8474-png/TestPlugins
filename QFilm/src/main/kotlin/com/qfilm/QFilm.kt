@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import org.jsoup.Jsoup
 import java.net.URLEncoder
+import java.net.URI
 
 class QFilm : MainAPI() {
     override var mainUrl = "https://movie.qfilm.tv"
@@ -13,6 +14,11 @@ class QFilm : MainAPI() {
     override val hasMainPage = true
     override val hasDownloadSupport = false
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
+
+    private fun resolveUrl(raw: String): String {
+        val value = raw.trim().replace("\\/", "/").replace("&amp;", "&")
+        return try { URI(mainUrl).resolve(value).toString() } catch (_: Exception) { value }
+    }
 
     override val mainPage = mainPageOf(
         "$mainUrl/" to "الرئيسية",
@@ -30,18 +36,15 @@ class QFilm : MainAPI() {
         val image = anchor.selectFirst("img") ?: selectFirst("img")
         val poster: String? = image?.let {
             it.attr("data-src").ifBlank { it.attr("data-original") }.ifBlank { it.attr("src") }
-        }?.takeIf { it.isNotBlank() }?.let { fixUrl(it) }
-        val url = fixUrl(href)
+        }?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
+        val url = resolveUrl(href)
         return newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
     }
 
     private fun extractResults(html: String): List<SearchResponse> {
         val doc = Jsoup.parse(html, mainUrl)
         return doc.select("a[href*='play.php?vid='], a[href*='watch.php?vid='], .pm-video-thumb, .video-item, .movie-item, .thumbnail")
-            .mapNotNull { element ->
-                val candidate = if (element.tagName() == "a") element else element
-                candidate.toResult()
-            }.distinctBy { it.url }
+            .mapNotNull { it.toResult() }.distinctBy { it.url }
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -67,7 +70,7 @@ class QFilm : MainAPI() {
             ?: doc.selectFirst("h1, .pm-video-title")?.text()?.trim()
             ?: doc.title().substringBefore(" HD").trim()
         val poster: String? = doc.selectFirst("meta[property=og:image]")?.attr("content")
-            ?.takeIf { it.isNotBlank() }?.let { fixUrl(it) }
+            ?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             posterUrl = poster
@@ -86,35 +89,35 @@ class QFilm : MainAPI() {
             "Referer" to "$mainUrl/"
         )).text.replace("\\/", "/").replace("&amp;", "&")
         val doc = Jsoup.parse(html, data)
-
-        // QFilm stores all selectable players in a JavaScript servers array.
-        // Extract iframe URLs from that array, plus the currently selected iframe.
         val servers = linkedSetOf<String>()
-        Regex("""<iframe\\b[^>]*?src\\s*=\\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(html).forEach { match -> servers.add(fixUrl(match.groupValues[1])) }
 
-        val arrayBody = Regex("""var\\s+servers\\s*=\\s*\\[(.*?)\\]\\s*;""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)).find(html)?.groupValues?.get(1)
+        Regex("""<iframe\b[^>]*?src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+            .findAll(html).forEach { servers.add(resolveUrl(it.groupValues[1])) }
+
+        val arrayBody = Regex(
+            """var\s+servers\s*=\s*\[(.*?)\]\s*;""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        ).find(html)?.groupValues?.get(1)
+
         if (!arrayBody.isNullOrBlank()) {
-            Regex("""src\\s*=\\s*\\?["'](https?://[^"'\\\\]+)""", RegexOption.IGNORE_CASE)
-                .findAll(arrayBody).forEach { match -> servers.add(match.groupValues[1].replace("\\\\/", "/")) }
-            Regex("""https?://[^"'\\\\\\s]+""", RegexOption.IGNORE_CASE)
-                .findAll(arrayBody).forEach { match -> servers.add(match.value.replace("\\\\/", "/")) }
+            Regex("""src\s*=\s*\?["'](https?://[^"'\\]+)""", RegexOption.IGNORE_CASE)
+                .findAll(arrayBody).forEach { servers.add(it.groupValues[1].replace("\\/", "/")) }
+            Regex("""https?://[^"'\s]+""", RegexOption.IGNORE_CASE)
+                .findAll(arrayBody).forEach { servers.add(it.value.replace("\\/", "/")) }
         }
 
-        // Some pages render the server iframe dynamically through the server buttons.
-        doc.select("[data-embed], .server-btn").forEach { el ->
-            val raw = el.attr("data-embed")
-            Regex("""src\\s*=\\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-                .find(raw)?.groupValues?.get(1)?.let { servers.add(fixUrl(it)) }
+        doc.select("[data-embed], .server-btn").forEach { element ->
+            val raw = element.attr("data-embed")
+            Regex("""src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                .find(raw)?.groupValues?.get(1)?.let { servers.add(resolveUrl(it)) }
         }
 
         var found = false
-        for (server in servers.filter { it.startsWith("http") }) {
+        for (server in servers.filter { it.startsWith("http://") || it.startsWith("https://") }) {
             try {
                 if (loadExtractor(server, data, subtitleCallback, callback)) found = true
             } catch (_: Exception) {
-                // Continue to the next player if one host is unavailable.
+                // Try the next available player.
             }
         }
         return found
