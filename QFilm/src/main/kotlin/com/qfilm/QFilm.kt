@@ -57,13 +57,36 @@ class QFilm : MainAPI() {
             .mapNotNull { it.toResult() }.distinctBy { it.url }
     }
 
+    private fun seriesResults(html: String): List<SearchResponse> {
+        val doc = Jsoup.parse(html, "https://a.qfilm.cam")
+        val results = linkedMapOf<String, SearchResponse>()
+        doc.select("a[href]").forEach { a ->
+            val href = a.attr("href")
+            if (!href.contains("qdrama-") && !href.contains("episode")) return@forEach
+            val title = a.attr("title").ifBlank { a.text() }.trim()
+            if (title.isBlank()) return@forEach
+            val seriesTitle = title.replace(Regex("(?i)\\s*(الموسم\\s*\\d+\\s*)?الحلقة.*$"), "").
+                replace(Regex("(?i)\\s*(season\\s*\\d+\\s*)?episode.*$"), "").trim()
+            if (seriesTitle.isBlank()) return@forEach
+            val image = a.selectFirst("img") ?: a.parent()?.selectFirst("img")
+            val poster = image?.let { it.attr("data-src").ifBlank { it.attr("src") } }
+                ?.takeIf { it.isNotBlank() }?.let { try { URI("https://a.qfilm.cam").resolve(it).toString() } catch (_: Exception) { it } }
+            val absolute = try { URI("https://a.qfilm.cam").resolve(href).toString() } catch (_: Exception) { href }
+            results.putIfAbsent(seriesTitle.lowercase(), newTvSeriesSearchResponse(seriesTitle, absolute, TvType.TvSeries) { posterUrl = poster })
+        }
+        return results.values.toList()
+    }
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page <= 1) request.data else {
             val separator = if (request.data.contains("?")) "&" else "?"
             request.data + separator + "page=$page"
         }
         val html = app.get(url, headers = mapOf("Referer" to "$mainUrl/")).text
-        return newHomePageResponse(request.name, extractResults(html))
+        return if (request.data.contains("a.qfilm.cam")) {
+            newHomePageResponse(request.name, seriesResults(html))
+        } else {
+            newHomePageResponse(request.name, extractResults(html))
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
