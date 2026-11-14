@@ -147,7 +147,7 @@ class AhwakTV : MainAPI() {
 
         // Recover absolute URLs embedded in JavaScript/configuration objects.
         val html = page.html().replace("\\/", "/").replace("\\u0026", "&")
-        Regex("""https?://[^\\s"'<>]+""").findAll(html).forEach { match ->
+        Regex("""https?://[^\s"'<>]+""").findAll(html).forEach { match ->
             candidates.add(match.value.trimEnd(',', ';', ')', ']'))
         }
 
