@@ -96,6 +96,42 @@ class QFilm : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
+        if (url.contains("a.qfilm.cam")) {
+            val episodePage = app.get(url, headers = mapOf("Referer" to "https://a.qfilm.cam/")).text
+            val episodeDoc = Jsoup.parse(episodePage, url)
+            val seriesUrl = if (url.contains("/series/")) url else episodeDoc.selectFirst("a[href*='/series/']")?.absUrl("href").orEmpty()
+            if (seriesUrl.isNotBlank()) {
+                val seriesHtml = if (seriesUrl == url) episodePage else app.get(seriesUrl, headers = mapOf("Referer" to url)).text
+                val doc = Jsoup.parse(seriesHtml, seriesUrl)
+                val title = doc.selectFirst("meta[property=og:title]")?.attr("content")?.takeIf { it.isNotBlank() }
+                    ?: doc.selectFirst("h1")?.text()?.trim() ?: doc.title()
+                val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }
+                val plot = doc.selectFirst("meta[name=description]")?.attr("content")
+                val seen = hashSetOf<String>()
+                val episodes = doc.select("a[href]").mapNotNull { a ->
+                    val href = a.attr("href")
+                    if (!href.contains("qdrama-")) return@mapNotNull null
+                    val episodeUrl = a.absUrl("href").ifBlank { try { URI("https://a.qfilm.cam").resolve(href).toString() } catch (_: Exception) { href } }
+                    val label = a.attr("title").ifBlank { a.text() }.trim()
+                    if (label.isBlank() || !seen.add(episodeUrl)) return@mapNotNull null
+                    episodeUrl to label
+                }.mapIndexed { index, item ->
+                    val digits = Regex("[0-9٠-٩]+").find(item.second)?.value
+                    val number = digits?.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }?.joinToString("")?.toIntOrNull() ?: index + 1
+                    val seasonMatch = Regex("(?i)(?:الموسم|season)\\s*(\\d+)").find(item.second)
+                    newEpisode(data = item.first) {
+                        name = item.second
+                        episode = number
+                        season = seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                        posterUrl = poster
+                    }
+                }
+                return newTvSeriesLoadResponse(title, seriesUrl, TvType.TvSeries, episodes) {
+                    posterUrl = poster
+                    this.plot = plot
+                }
+            }
+        }
         val html = app.get(url, headers = mapOf("Referer" to "$mainUrl/")).text
         val doc = Jsoup.parse(html, url)
         val title = doc.selectFirst("meta[property=og:title]")?.attr("content")
@@ -142,6 +178,25 @@ class QFilm : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        if (data.contains("a.qfilm.cam")) {
+            val cleanUrl = data.substringBefore("?").trimEnd('/')
+            val slug = cleanUrl.substringAfterLast('/')
+            val playerUrl = if (cleanUrl.contains("/watch/")) cleanUrl + "/servers" else "https://a.qfilm.cam/watch/$slug/servers"
+            return try {
+                val playerHtml = app.get(playerUrl, headers = mapOf("Referer" to data, "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")).text
+                val playerDoc = Jsoup.parse(playerHtml, playerUrl)
+                val servers = linkedSetOf<String>()
+                playerDoc.select("iframe[src], iframe[data-src], a[href]").forEach { element ->
+                    val candidate = element.attr("src").ifBlank { element.attr("data-src") }.ifBlank { element.attr("href") }
+                    if (candidate.startsWith("http") && !candidate.contains("a.qfilm.cam")) servers.add(candidate)
+                }
+                var found = false
+                servers.forEach { server ->
+                    try { if (loadExtractor(server, playerUrl, subtitleCallback, callback)) found = true } catch (_: Exception) { }
+                }
+                found
+            } catch (_: Exception) { false }
+        }
         val id = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
             .find(data)?.groupValues?.get(1) ?: return false
         val watchUrl = if (data.contains("watch.php", true)) data else "$mainUrl/watch.php?vid=$id"
