@@ -28,9 +28,9 @@ class QFilm : MainAPI() {
             .ifBlank { anchor.selectFirst("img")?.attr("alt").orEmpty() }.trim()
         if (title.isBlank()) return null
         val image = anchor.selectFirst("img") ?: selectFirst("img")
-        val poster = fixUrlNull(image?.let {
+        val poster: String? = image?.let {
             it.attr("data-src").ifBlank { it.attr("data-original") }.ifBlank { it.attr("src") }
-        })
+        }?.takeIf { it.isNotBlank() }?.let { fixUrl(it) }
         val url = fixUrl(href)
         return newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
     }
@@ -66,7 +66,8 @@ class QFilm : MainAPI() {
             ?.takeIf { it.isNotBlank() }
             ?: doc.selectFirst("h1, .pm-video-title")?.text()?.trim()
             ?: doc.title().substringBefore(" HD").trim()
-        val poster = fixUrlNull(doc.selectFirst("meta[property=og:image]")?.attr("content"))
+        val poster: String? = doc.selectFirst("meta[property=og:image]")?.attr("content")
+            ?.takeIf { it.isNotBlank() }?.let { fixUrl(it) }
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             posterUrl = poster
