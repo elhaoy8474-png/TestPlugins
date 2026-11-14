@@ -22,10 +22,10 @@
     },
     {
         "iconUrl": "https://movie.qfilm.tv/favicons/android-icon-192x192.png",
-        "fileHash": "sha256-88e17263ccd6230b6d01880c41cda0b8c97b70cdfc8adf7b1c64ba44717167ec",
+        "fileHash": "sha256-b1e1d79aabc04c35bba743b9ddaf53fa4d891842039e9cda03ed5ab3563c4c7f",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 13223,
+        "fileSize": 16451,
         "status": 3,
         "language": "ar",
         "authors": [
