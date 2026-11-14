@@ -66,35 +66,62 @@ class AhwakTV : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document
-        val title = document.selectFirst("h1, .pm-video-title")?.text()?.trim()
+        val headings = document.select("h1, .pm-video-title")
+            .map { it.text().trim() }
+            .filter { it.isNotBlank() }
+
+        // AhwakTV puts the episode title first and the series title in a
+        // second heading. Prefer the heading that is not an episode title.
+        val seriesHeading = headings.firstOrNull {
+            !it.contains("الحلقة", true) && !it.contains("حلقة", true)
+        }
+        val pageTitle = headings.firstOrNull()
             ?: document.title().substringBefore(" HD").trim().ifBlank { "Unknown" }
+        val title = seriesHeading ?: pageTitle
+            .replace(Regex("\\\\s+الحلقة\\\\s+\\\\d+.*$", RegexOption.IGNORE_CASE), "")
+            .trim()
+
         val poster = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
         val description = document.selectFirst("meta[name=description]")?.attr("content")
 
-        val isEpisode = title.contains("الحلقة", true) || title.contains("حلقة", true)
-        val episodeLinks = if (isEpisode) emptyList() else document
-            .select("a[href*='watch.php?vid=']")
-            .filter { it.attr("title").ifBlank { it.text() }.contains("حلقة", true) }
+        // The site lists episodes as links labelled "1 حلقة", "2 حلقة", etc.
+        // Do not classify the whole page as a movie just because its first
+        // heading is the title of the currently selected episode.
+        val episodeLinks = document.select("a[href*='watch.php'][href*='vid='], a[href*='vid=']")
+            .filter { element ->
+                val label = element.attr("title").ifBlank { element.text() }.trim()
+                label.contains("حلقة", true) ||
+                    Regex("^\\\\s*\\\\d+\\\\s*$").containsMatchIn(label)
+            }
             .distinctBy { it.attr("href") }
 
         if (episodeLinks.isNotEmpty()) {
             val episodes = episodeLinks.mapIndexed { index, element ->
                 val episodeTitle = element.attr("title").ifBlank { element.text() }.trim()
-                    .ifBlank { "الحلقة ${index + 1}" }
-                val number = Regex("(\\d+)").find(episodeTitle)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    .ifBlank { "الحلقة " + (index + 1) }
+                val number = Regex("(\\\\d+)").find(episodeTitle)
+                    ?.groupValues?.getOrNull(1)?.toIntOrNull()
+                val episodePoster = fixUrlNull(
+                    element.selectFirst("img")?.let { img ->
+                        img.attr("data-src").ifBlank { img.attr("src") }
+                    }
+                )
                 newEpisode(data = playerUrl(fixUrl(element.attr("href")))) {
-                    name = episodeTitle
+                    name = if (episodeTitle.contains("حلقة", true)) episodeTitle
+                        else "الحلقة " + (number ?: index + 1)
                     episode = number ?: (index + 1)
                     season = 1
+                    posterUrl = episodePoster ?: poster
                 }
-            }
+            }.sortedBy { it.episode ?: Int.MAX_VALUE }
+
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 posterUrl = poster
                 plot = description
             }
         }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, playerUrl(url)) {
+        return newMovieLoadResponse(pageTitle, url, TvType.Movie, playerUrl(url)) {
             posterUrl = poster
             plot = description
         }
