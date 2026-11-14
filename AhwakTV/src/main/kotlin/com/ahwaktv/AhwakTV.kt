@@ -101,17 +101,12 @@ class AhwakTV : MainAPI() {
                     .ifBlank { "الحلقة " + (index + 1) }
                 val number = Regex("(\\d+)").find(episodeTitle)
                     ?.groupValues?.getOrNull(1)?.toIntOrNull()
-                val episodePoster = fixUrlNull(
-                    element.selectFirst("img")?.let { img ->
-                        img.attr("data-src").ifBlank { img.attr("src") }
-                    }
-                )
                 newEpisode(data = playerUrl(fixUrl(element.attr("href")))) {
                     name = if (episodeTitle.contains("حلقة", true)) episodeTitle
                         else "الحلقة " + (number ?: index + 1)
                     episode = number ?: (index + 1)
                     season = 1
-                    posterUrl = episodePoster ?: poster
+                    posterUrl = poster
                 }
             }.sortedBy { it.episode ?: Int.MAX_VALUE }
 
