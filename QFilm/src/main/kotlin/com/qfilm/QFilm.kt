@@ -125,7 +125,8 @@ class QFilm : MainAPI() {
                         season = seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
                         posterUrl = poster
                     }
-                }
+                }.distinctBy { "${it.season ?: 1}:${it.episode ?: -1}" }
+                    .sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
                 return newTvSeriesLoadResponse(title, seriesUrl, TvType.TvSeries, episodes) {
                     posterUrl = poster
                     this.plot = plot
@@ -172,6 +173,40 @@ class QFilm : MainAPI() {
         }
     }
 
+    // Same packed-JavaScript fallback used by the working AhwakTV provider.
+    private fun unpackPackedJs(source: String): String? {
+        val eval = Regex(
+            "eval\\\\s*\\\\(\\\\s*function\\\\s*\\\\(.*?\\\\)\\\\s*\\\\{.*?\\\\}\\\\s*\\\\((.*)\\\\)\\\\s*\\\\)",
+            setOf(RegexOption.DOT_MATCHES_ALL)
+        ).find(source) ?: return null
+        val args = Regex(
+            """['"](.+?)['"]\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*['"](.+?)['"]\\.split\\s*\\(['"]\\|['"]\\)""",
+            setOf(RegexOption.DOT_MATCHES_ALL)
+        ).find(eval.groupValues[1]) ?: return null
+        val packed = args.groupValues[1]
+        val radix = args.groupValues[2].toIntOrNull() ?: return null
+        val count = args.groupValues[3].toIntOrNull() ?: return null
+        val keys = args.groupValues[4].split('|')
+        val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        fun base(value: Int): String {
+            if (value == 0) return "0"
+            var n = value
+            val out = StringBuilder()
+            while (n > 0) {
+                out.insert(0, chars[n % radix])
+                n /= radix
+            }
+            return out.toString()
+        }
+        val replacements = HashMap<String, String>()
+        for (i in 0 until count) keys.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let {
+            replacements[base(i)] = it
+        }
+        return Regex("\\\\b\\\\w+\\\\b").replace(packed) { match ->
+            replacements[match.value] ?: match.value
+        }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -190,9 +225,36 @@ class QFilm : MainAPI() {
                     val candidate = element.attr("src").ifBlank { element.attr("data-src") }.ifBlank { element.attr("href") }
                     if (candidate.startsWith("http") && !candidate.contains("a.qfilm.cam")) servers.add(candidate)
                 }
+                // Try the CloudStream extractor first, then inspect the host page
+                // for native video/source tags or packed-JS file URLs (AhwakTV pattern).
                 var found = false
-                servers.forEach { server ->
-                    try { if (loadExtractor(server, playerUrl, subtitleCallback, callback)) found = true } catch (_: Exception) { }
+                for (server in servers) {
+                    try {
+                        if (loadExtractor(server, playerUrl, subtitleCallback, callback)) {
+                            found = true
+                            continue
+                        }
+                        val hostHtml = app.get(server, headers = mapOf(
+                            "Referer" to playerUrl,
+                            "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36"
+                        )).text
+                        val unpacked = unpackPackedJs(hostHtml) ?: hostHtml
+                        val hostDoc = Jsoup.parse(unpacked, server)
+                        val directFiles = linkedSetOf<String>()
+                        hostDoc.select("video[src], video source[src], source[src]").forEach { node ->
+                            node.absUrl("src").takeIf { it.startsWith("http") }?.let(directFiles::add)
+                        }
+                        Regex("""['"]?file['"]?\\s*[:=]\\s*['"](https?[^'"]+)['"]""", RegexOption.IGNORE_CASE)
+                            .findAll(unpacked).forEach { directFiles.add(it.groupValues[1].replace("\\\\/", "/")) }
+                        directFiles.forEach { file ->
+                            val type = if (file.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                            callback(newExtractorLink(name, "QFilm - ${server.substringAfter("://").substringBefore("/")}", file, type) {
+                                referer = server
+                                quality = Qualities.Unknown.value
+                            })
+                            found = true
+                        }
+                    } catch (_: Exception) { }
                 }
                 found
             } catch (_: Exception) { false }
