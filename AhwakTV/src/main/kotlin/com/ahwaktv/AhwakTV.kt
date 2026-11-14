@@ -87,14 +87,19 @@ class AhwakTV : MainAPI() {
             val link = it.attr("src").ifBlank { it.attr("href") }
             if (link.isNotBlank()) {
                 callback.invoke(
-                    ExtractorLink(
+                    newExtractorLink(
                         name,
                         name,
                         fixUrl(link),
-                        mainUrl,
-                        Qualities.Unknown.value,
-                        isM3u8 = link.contains(".m3u8")
-                    )
+                        if (link.contains(".m3u8", ignoreCase = true)) {
+                            ExtractorLinkType.M3U8
+                        } else {
+                            ExtractorLinkType.VIDEO
+                        }
+                    ) {
+                        this.referer = mainUrl
+                        this.quality = Qualities.Unknown.value
+                    }
                 )
             }
         }
