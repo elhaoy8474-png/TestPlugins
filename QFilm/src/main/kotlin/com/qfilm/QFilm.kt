@@ -38,7 +38,9 @@ class QFilm : MainAPI() {
             it.attr("data-src").ifBlank { it.attr("data-original") }.ifBlank { it.attr("src") }
         }?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
         val url = resolveUrl(href)
-        return newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
+        return if (title.contains("مسلسل", true) && !title.contains("الحلقة", true)) {
+            newTvSeriesSearchResponse(title, url, TvType.TvSeries) { posterUrl = poster }
+        } else newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
     }
 
     private fun extractResults(html: String): List<SearchResponse> {
@@ -72,6 +74,32 @@ class QFilm : MainAPI() {
         val poster: String? = doc.selectFirst("meta[property=og:image]")?.attr("content")
             ?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")
+        val episodes = mutableListOf<Episode>()
+        val seen = hashSetOf<String>()
+        doc.select("a[href*='watch.php?vid=']").forEach { element ->
+            val episodeUrl = resolveUrl(element.attr("href"))
+            val episodeId = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
+                .find(episodeUrl)?.groupValues?.get(1) ?: return@forEach
+            if (!seen.add(episodeId)) return@forEach
+            val label = element.attr("title").ifBlank { element.text() }.trim()
+            if (!label.contains("حلقة", true) && !label.contains("episode", true) &&
+                !Regex("[0-9٠-٩]+").containsMatchIn(label)) return@forEach
+            val numberText = Regex("[0-9٠-٩]+").find(label)?.value
+            val number = numberText?.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }
+                ?.joinToString("")?.toIntOrNull() ?: (episodes.size + 1)
+            episodes.add(newEpisode(data = episodeUrl) {
+                name = label.ifBlank { "الحلقة $number" }
+                episode = number
+                season = 1
+                posterUrl = poster
+            })
+        }
+        if (episodes.isNotEmpty()) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                posterUrl = poster
+                this.plot = plot
+            }
+        }
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             posterUrl = poster
             this.plot = plot
@@ -86,12 +114,27 @@ class QFilm : MainAPI() {
     ): Boolean {
         val id = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
             .find(data)?.groupValues?.get(1) ?: return false
-        val playUrl = "$mainUrl/play.php?vid=$id"
-        val response = app.get(playUrl, headers = mapOf(
+        val watchUrl = if (data.contains("watch.php", true)) data else "$mainUrl/watch.php?vid=$id"
+        // QFilm's player list is rendered by embed.php, not play.php.
+        // Try the dedicated embed page first, then legacy player endpoints.
+        val headers = mapOf(
             "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36",
-            "Referer" to "$mainUrl/"
-        ))
-        val rawHtml = response.text
+            "Referer" to watchUrl
+        )
+        val pageUrls = listOf("$mainUrl/embed.php?vid=$id", "$mainUrl/play.php?vid=$id", watchUrl)
+        var rawHtml = ""
+        var playerPage = pageUrls.first()
+        for (pageUrl in pageUrls) {
+            try {
+                val page = app.get(pageUrl, headers = headers).text
+                if (page.isNotBlank()) {
+                    rawHtml = page
+                    playerPage = pageUrl
+                    if (page.contains("servers", true) || page.contains("iframe", true)) break
+                }
+            } catch (_: Exception) { }
+        }
+        if (rawHtml.isBlank()) return false
         // QFilm embeds player iframes inside JavaScript strings. Normalize
         // escaped slashes, quotes and HTML entities before parsing them.
         val html = rawHtml
@@ -101,7 +144,7 @@ class QFilm : MainAPI() {
             .replace("&amp;", "&")
             .replace("&quot;", "\"")
             .replace("&#39;", "'")
-        val doc = Jsoup.parse(html, playUrl)
+        val doc = Jsoup.parse(html, playerPage)
         val servers = linkedSetOf<String>()
 
         fun addServer(raw: String) {
@@ -153,7 +196,7 @@ class QFilm : MainAPI() {
         var found = false
         for (server in servers) {
             try {
-                if (loadExtractor(server, playUrl, subtitleCallback, callback)) {
+                if (loadExtractor(server, playerPage, subtitleCallback, callback)) {
                     found = true
                 }
             } catch (_: Exception) {
