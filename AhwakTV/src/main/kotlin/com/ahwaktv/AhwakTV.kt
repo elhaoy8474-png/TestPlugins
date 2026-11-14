@@ -119,7 +119,7 @@ class AhwakTV : MainAPI() {
                 })
             }
         }
-        val uniqueEpisodes = episodes.distinctBy { ${it.season}:${it.episode} }
+        val uniqueEpisodes = episodes.distinctBy { "${it.season}:${it.episode}" }
             .sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
         if (uniqueEpisodes.isNotEmpty()) {
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, uniqueEpisodes) {
@@ -143,7 +143,7 @@ class AhwakTV : MainAPI() {
     private fun unpackPackedJs(source: String): String? {
         val eval = Regex("eval\\s*\\(\\s*function\\s*\\(.*?\\)\\s*\\{.*?\\}\\s*\\((.*)\\)\\s*\\)",
             setOf(RegexOption.DOT_MATCHES_ALL)).find(source) ?: return null
-        val args = Regex("['\\"](.*?)['\\"]\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*['\\"](.*?)['\\"]\\.split\\s*\\(['\\"]\\|['\\"]\\)",
+        val args = Regex("""['"](.*?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"](.*?)['"]\.split\s*\(['"]\|['"]\)""",
             setOf(RegexOption.DOT_MATCHES_ALL)).find(eval.groupValues[1]) ?: return null
         val packed = args.groupValues[1]
         val radix = args.groupValues[2].toIntOrNull() ?: return null
@@ -206,7 +206,7 @@ class AhwakTV : MainAPI() {
                     val type = when {
                         file.contains(".m3u8", true) -> ExtractorLinkType.M3U8
                         file.contains(".mp4", true) -> ExtractorLinkType.VIDEO
-                        else -> ExtractorLinkType.INFERRED
+                        else -> ExtractorLinkType.VIDEO
                     }
                     callback(newExtractorLink(name, label, file, type) {
                         referer = link
