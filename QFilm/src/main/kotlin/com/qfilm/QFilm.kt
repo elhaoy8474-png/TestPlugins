@@ -84,40 +84,80 @@ class QFilm : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val html = app.get(data, headers = mapOf(
+        val id = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
+            .find(data)?.groupValues?.get(1) ?: return false
+        val playUrl = "$mainUrl/play.php?vid=$id"
+        val response = app.get(playUrl, headers = mapOf(
             "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36",
             "Referer" to "$mainUrl/"
-        )).text.replace("\\/", "/").replace("&amp;", "&")
-        val doc = Jsoup.parse(html, data)
+        ))
+        val rawHtml = response.text
+        // QFilm embeds player iframes inside JavaScript strings. Normalize
+        // escaped slashes, quotes and HTML entities before parsing them.
+        val html = rawHtml
+            .replace("\\\\/", "/")
+            .replace("\\\"", "\"")
+            .replace("\\'", "'")
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+        val doc = Jsoup.parse(html, playUrl)
         val servers = linkedSetOf<String>()
 
-        Regex("""<iframe\b[^>]*?src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(html).forEach { servers.add(resolveUrl(it.groupValues[1])) }
+        fun addServer(raw: String) {
+            val candidate = raw.trim()
+                .trim('\\'', '"')
+                .replace("\\\\/", "/")
+                .replace("&amp;", "&")
+                .replace("&#39;", "'")
+            if (candidate.startsWith("https://") || candidate.startsWith("http://")) {
+                if (candidate != mainUrl && !candidate.startsWith("$mainUrl/")) {
+                    servers.add(candidate)
+                }
+            }
+        }
 
-        val arrayBody = Regex(
-            """var\s+servers\s*=\s*\[(.*?)\]\s*;""",
+        // Real iframe elements and lazy-loaded iframe attributes.
+        doc.select("iframe[src], iframe[data-src], [data-embed]").forEach { element ->
+            val value = element.attr("src")
+                .ifBlank { element.attr("data-src") }
+                .ifBlank { element.attr("data-embed") }
+            if (value.contains("<iframe", true)) {
+                Regex("""src\\s*=\\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                    .find(value)?.groupValues?.get(1)?.let(::addServer)
+            } else {
+                addServer(value)
+            }
+        }
+
+        // Player lists are commonly stored as escaped iframe HTML in JS arrays.
+        val serverArray = Regex(
+            """(?:var|let|const)\\s+servers\\s*=\\s*\\[(.*?)\\]""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-        ).find(html)?.groupValues?.get(1)
+        ).find(html)?.groupValues?.get(1).orEmpty()
 
-        if (!arrayBody.isNullOrBlank()) {
-            Regex("""src\s*=\s*\\?["'](https?://[^"'\\]+)""", RegexOption.IGNORE_CASE)
-                .findAll(arrayBody).forEach { servers.add(it.groupValues[1].replace("\\/", "/")) }
-            Regex("""https?://[^"'\s]+""", RegexOption.IGNORE_CASE)
-                .findAll(arrayBody).forEach { servers.add(it.value.replace("\\/", "/")) }
+        val searchSources = listOf(serverArray, html)
+        for (source in searchSources) {
+            Regex(
+                """src\\s*=\\s*\\\\?["'](https?://[^"'\\s<>]+)""",
+                RegexOption.IGNORE_CASE
+            ).findAll(source).forEach { addServer(it.groupValues[1]) }
+
+            Regex(
+                """https?://[^"'\\s<>\\\\]+""",
+                RegexOption.IGNORE_CASE
+            ).findAll(source).forEach { addServer(it.value) }
         }
 
-        doc.select("[data-embed], .server-btn").forEach { element ->
-            val raw = element.attr("data-embed")
-            Regex("""src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-                .find(raw)?.groupValues?.get(1)?.let { servers.add(resolveUrl(it)) }
-        }
-
+        // Keep order, remove duplicates, and try every discovered player.
         var found = false
-        for (server in servers.filter { it.startsWith("http://") || it.startsWith("https://") }) {
+        for (server in servers) {
             try {
-                if (loadExtractor(server, data, subtitleCallback, callback)) found = true
+                if (loadExtractor(server, playUrl, subtitleCallback, callback)) {
+                    found = true
+                }
             } catch (_: Exception) {
-                // Try the next available player.
+                // A broken player must not prevent trying the remaining servers.
             }
         }
         return found
