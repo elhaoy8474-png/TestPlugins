@@ -100,7 +100,7 @@ class QFilm : MainAPI() {
         ).find(html)?.groupValues?.get(1)
 
         if (!arrayBody.isNullOrBlank()) {
-            Regex("""src\s*=\s*\?["'](https?://[^"'\\]+)""", RegexOption.IGNORE_CASE)
+            Regex("""src\s*=\s*\\?["'](https?://[^"'\\]+)""", RegexOption.IGNORE_CASE)
                 .findAll(arrayBody).forEach { servers.add(it.groupValues[1].replace("\\/", "/")) }
             Regex("""https?://[^"'\s]+""", RegexOption.IGNORE_CASE)
                 .findAll(arrayBody).forEach { servers.add(it.value.replace("\\/", "/")) }
