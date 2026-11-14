@@ -130,15 +130,26 @@ class AhwakTV : MainAPI() {
     ): Boolean {
         val page = app.get(data, referer = "$mainUrl/").document
         var found = false
-        val candidates = page.select(
-            "iframe[src], iframe[data-src], iframe[data-lazy-src], a[href], [data-url], [data-embed], [data-src]"
-        ).mapNotNull { element ->
+
+        // Some AhwakTV episodes keep the actual embed URL inside player scripts
+        // rather than exposing it as a normal iframe/src attribute.
+        val candidates = linkedSetOf<String>()
+        page.select(
+            "iframe[src], iframe[data-src], iframe[data-lazy-src], a[href], [data-url], [data-embed], [data-src], video source[src], video[src], source[src]"
+        ).forEach { element ->
             val raw = element.attr("src").ifBlank { element.attr("data-src") }
                 .ifBlank { element.attr("data-lazy-src") }.ifBlank { element.attr("data-url") }
                 .ifBlank { element.attr("data-embed") }.ifBlank { element.attr("href") }
-            if (raw.isBlank() || raw.startsWith("javascript:") || raw.startsWith("#")) null
-            else fixUrl(raw)
-        }.distinct()
+            if (raw.isNotBlank() && !raw.startsWith("javascript:") && !raw.startsWith("#")) {
+                candidates.add(fixUrl(raw))
+            }
+        }
+
+        // Recover absolute URLs embedded in JavaScript/configuration objects.
+        val html = page.html().replace("\\\\/", "/").replace("\\u0026", "&")
+        Regex("""https?:\\?/\\?/[^\\s"'<>\\\\]+""").findAll(html).forEach { match ->
+            candidates.add(match.value.replace("\\/", "/").trimEnd(',', ';', ')', ']'))
+        }
 
         for (candidate in candidates) {
             val host = candidate.substringAfter("://").substringBefore("/").lowercase()
@@ -146,10 +157,12 @@ class AhwakTV : MainAPI() {
                 !host.endsWith("aahwaktv.beer")
             if (external && !candidate.contains("ahwaktv", true)) {
                 try {
-                    loadExtractor(candidate, data, subtitleCallback, callback)
-                    found = true
+                    loadExtractor(candidate, data, subtitleCallback) { link ->
+                        found = true
+                        callback(link)
+                    }
                 } catch (_: Exception) {
-                    // Continue to the next available server.
+                    // Try the next server; one broken host must not stop playback.
                 }
             }
         }
@@ -170,4 +183,5 @@ class AhwakTV : MainAPI() {
         }
         return found
     }
+}
 }
