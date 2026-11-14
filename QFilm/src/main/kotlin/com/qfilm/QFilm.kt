@@ -76,14 +76,13 @@ class QFilm : MainAPI() {
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")
         val episodes = mutableListOf<Episode>()
         val seen = hashSetOf<String>()
-        doc.select("a[href*='watch.php?vid=']").forEach { element ->
+        doc.select("a[href*='watch.php?vid='], a[href*='play.php?vid=']").forEach { element ->
             val episodeUrl = resolveUrl(element.attr("href"))
             val episodeId = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
                 .find(episodeUrl)?.groupValues?.get(1) ?: return@forEach
             if (!seen.add(episodeId)) return@forEach
             val label = element.attr("title").ifBlank { element.text() }.trim()
-            if (!label.contains("حلقة", true) && !label.contains("episode", true) &&
-                !Regex("[0-9٠-٩]+").containsMatchIn(label)) return@forEach
+            if (!label.contains("حلقة", true) && !label.contains("episode", true)) return@forEach
             val numberText = Regex("[0-9٠-٩]+").find(label)?.value
             val number = numberText?.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }
                 ?.joinToString("")?.toIntOrNull() ?: (episodes.size + 1)
