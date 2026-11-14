@@ -78,7 +78,7 @@ class AhwakTV : MainAPI() {
         val pageTitle = headings.firstOrNull()
             ?: document.title().substringBefore(" HD").trim().ifBlank { "Unknown" }
         val title = seriesHeading ?: pageTitle
-            .replace(Regex("\\\\s+الحلقة\\\\s+\\\\d+.*$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+الحلقة\\s+\\d+.*$", RegexOption.IGNORE_CASE), "")
             .trim()
 
         val poster = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
@@ -91,7 +91,7 @@ class AhwakTV : MainAPI() {
             .filter { element ->
                 val label = element.attr("title").ifBlank { element.text() }.trim()
                 label.contains("حلقة", true) ||
-                    Regex("^\\\\s*\\\\d+\\\\s*$").containsMatchIn(label)
+                    Regex("^\\s*\\d+\\s*$").containsMatchIn(label)
             }
             .distinctBy { it.attr("href") }
 
@@ -99,7 +99,7 @@ class AhwakTV : MainAPI() {
             val episodes = episodeLinks.mapIndexed { index, element ->
                 val episodeTitle = element.attr("title").ifBlank { element.text() }.trim()
                     .ifBlank { "الحلقة " + (index + 1) }
-                val number = Regex("(\\\\d+)").find(episodeTitle)
+                val number = Regex("(\\d+)").find(episodeTitle)
                     ?.groupValues?.getOrNull(1)?.toIntOrNull()
                 val episodePoster = fixUrlNull(
                     element.selectFirst("img")?.let { img ->
