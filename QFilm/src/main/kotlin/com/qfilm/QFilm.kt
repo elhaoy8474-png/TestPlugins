@@ -176,11 +176,11 @@ class QFilm : MainAPI() {
     // Same packed-JavaScript fallback used by the working AhwakTV provider.
     private fun unpackPackedJs(source: String): String? {
         val eval = Regex(
-            "eval\\\\s*\\\\(\\\\s*function\\\\s*\\\\(.*?\\\\)\\\\s*\\\\{.*?\\\\}\\\\s*\\\\((.*)\\\\)\\\\s*\\\\)",
+            """eval\s*\(\s*function\s*\(.*?\)\s*\{.*?\}\s*\((.*)\)\s*\)""",
             setOf(RegexOption.DOT_MATCHES_ALL)
         ).find(source) ?: return null
         val args = Regex(
-            """['"](.+?)['"]\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*['"](.+?)['"]\\.split\\s*\\(['"]\\|['"]\\)""",
+            """['"](.+?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"](.+?)['"]\.split\s*\(['"]\|['"]\)""",
             setOf(RegexOption.DOT_MATCHES_ALL)
         ).find(eval.groupValues[1]) ?: return null
         val packed = args.groupValues[1]
@@ -202,7 +202,7 @@ class QFilm : MainAPI() {
         for (i in 0 until count) keys.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let {
             replacements[base(i)] = it
         }
-        return Regex("\\\\b\\\\w+\\\\b").replace(packed) { match ->
+        return Regex("""\b\w+\b""").replace(packed) { match ->
             replacements[match.value] ?: match.value
         }
     }
