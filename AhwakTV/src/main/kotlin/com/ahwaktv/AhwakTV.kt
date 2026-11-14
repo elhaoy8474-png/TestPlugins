@@ -128,54 +128,72 @@ class AhwakTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val page = app.get(data, referer = "$mainUrl/").document
-        var found = false
+        val response = app.get(data, referer = "$mainUrl/")
+        val page = response.document
+        val pageUrl = response.url
+        val candidates = linkedMapOf<String, String>()
 
-        // Some AhwakTV episodes keep the actual embed URL inside player scripts
-        // rather than exposing it as a normal iframe/src attribute.
-        val candidates = linkedSetOf<String>()
-        page.select(
-            "iframe[src], iframe[data-src], iframe[data-lazy-src], a[href], [data-url], [data-embed], [data-src], video source[src], video[src], source[src]"
-        ).forEach { element ->
-            val raw = element.attr("src").ifBlank { element.attr("data-src") }
-                .ifBlank { element.attr("data-lazy-src") }.ifBlank { element.attr("data-url") }
-                .ifBlank { element.attr("data-embed") }.ifBlank { element.attr("href") }
-            if (raw.isNotBlank() && !raw.startsWith("javascript:") && !raw.startsWith("#")) {
-                candidates.add(fixUrl(raw))
+        fun addCandidate(rawValue: String?, referer: String = pageUrl) {
+            val raw = rawValue?.trim()?.replace("\\/", "/")
+                ?.replace("&amp;", "&")
+                ?.trim('"', '\'', ' ')
+                ?: return
+            if (raw.isBlank() || raw.startsWith("#") || raw.startsWith("javascript:", true)) return
+            val url = fixUrl(raw)
+            if (url.startsWith("http", true)) candidates.putIfAbsent(url, referer)
+        }
+
+        // Read the selected player and every server button/link. AhwakTV may
+        // keep non-selected servers in data-* attributes or inline handlers.
+        page.select("iframe, video, source, a[href], [data-src], [data-url], [data-link], [data-embed], [data-embed-url], [data-video], [data-href], [onclick], [data-server]")
+            .forEach { element ->
+                listOf(
+                    "src", "data-src", "data-lazy-src", "data-url", "data-link",
+                    "data-embed", "data-embed-url", "data-video", "data-href", "href"
+                ).forEach { key ->
+                    if (element.hasAttr(key)) addCandidate(element.attr(key))
+                }
+                if (element.hasAttr("onclick")) {
+                    val handler = element.attr("onclick").replace("\\/", "/")
+                    Regex("""https?://[^\\s"'<>]+""").findAll(handler).forEach {
+                        addCandidate(it.value.trimEnd(',', ';', ')', ']'))
+                    }
+                }
             }
-        }
 
-        // Recover absolute URLs embedded in JavaScript/configuration objects.
-        val html = page.html().replace("\\/", "/").replace("\\u0026", "&")
-        Regex("""https?://[^\s"'<>]+""").findAll(html).forEach { match ->
-            candidates.add(match.value.trimEnd(',', ';', ')', ']'))
+        // Some player templates store their server URLs only in scripts.
+        val html = page.html()
+            .replace("\\/", "/")
+            .replace("\\u0026", "&")
+            .replace("\\u003d", "=")
+            .replace("&amp;", "&")
+        Regex("""https?://[^\\s"'<>\\\\]+""").findAll(html).forEach { match ->
+            addCandidate(match.value.trimEnd(',', ';', ')', ']', '}'))
         }
+        Regex("""(?:src|file|url|link|embed)\\s*[:=]\\s*['"]([^'"]+)['"]""", RegexOption.IGNORE_CASE)
+            .findAll(html).forEach { addCandidate(it.groupValues[1]) }
 
-        for (candidate in candidates) {
+        var found = false
+        val directSeen = hashSetOf<String>()
+        for ((candidate, referer) in candidates) {
+            if (!directSeen.add(candidate)) continue
             val host = candidate.substringAfter("://").substringBefore("/").lowercase()
-            val external = host.isNotBlank() && !host.endsWith("ahwaktv.quest") &&
-                !host.endsWith("aahwaktv.beer")
-            if (external && !candidate.contains("ahwaktv", true)) {
+            val ownHost = host.endsWith("ahwaktv.quest") || host.endsWith("aahwaktv.beer")
+            if (!ownHost && !candidate.contains("ahwaktv", true)) {
                 try {
-                    loadExtractor(candidate, data, subtitleCallback) { link ->
+                    loadExtractor(candidate, referer, subtitleCallback) { link ->
                         found = true
                         callback(link)
                     }
                 } catch (_: Exception) {
-                    // Try the next server; one broken host must not stop playback.
+                    // Continue: a dead server must not block the remaining mirrors.
                 }
-            }
-        }
-
-        page.select("video source[src], video[src], source[src]").forEach { element ->
-            val raw = element.attr("src")
-            if (raw.contains(".m3u8", true) || raw.contains(".mp4", true)) {
-                val media = fixUrl(raw)
+            } else if (candidate.contains(".m3u8", true) || candidate.contains(".mp4", true)) {
                 callback(newExtractorLink(
-                    name, name, media,
-                    if (media.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    name, name, candidate,
+                    if (candidate.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 ) {
-                    referer = data
+                    this.referer = referer
                     quality = Qualities.Unknown.value
                 })
                 found = true
