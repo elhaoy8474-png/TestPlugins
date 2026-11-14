@@ -244,8 +244,8 @@ class QFilm : MainAPI() {
                         hostDoc.select("video[src], video source[src], source[src]").forEach { node ->
                             node.absUrl("src").takeIf { it.startsWith("http") }?.let(directFiles::add)
                         }
-                        Regex("""['"]?file['"]?\\s*[:=]\\s*['"](https?[^'"]+)['"]""", RegexOption.IGNORE_CASE)
-                            .findAll(unpacked).forEach { directFiles.add(it.groupValues[1].replace("\\\\/", "/")) }
+                        Regex("""['"]?file['"]?\s*[:=]\s*['"](https?[^'"]+)['"]""", RegexOption.IGNORE_CASE)
+                            .findAll(unpacked).forEach { directFiles.add(it.groupValues[1].replace("\\/", "/")) }
                         directFiles.forEach { file ->
                             val type = if (file.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                             callback(newExtractorLink(name, "QFilm - ${server.substringAfter("://").substringBefore("/")}", file, type) {
