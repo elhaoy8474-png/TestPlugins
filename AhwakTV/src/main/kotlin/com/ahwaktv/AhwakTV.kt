@@ -84,33 +84,45 @@ class AhwakTV : MainAPI() {
         val poster = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
         val description = document.selectFirst("meta[name=description]")?.attr("content")
 
-        // The site lists episodes as links labelled "1 حلقة", "2 حلقة", etc.
-        // Do not classify the whole page as a movie just because its first
-        // heading is the title of the currently selected episode.
-        val episodeLinks = document.select("a[href*='watch.php'][href*='vid='], a[href*='vid=']")
-            .filter { element ->
+        val episodes = mutableListOf<Episode>()
+        // Keep each season in its own container: episode 1 in season 2 is not a duplicate.
+        document.select("div[id^=Season], section[id^=Season], [data-season]").forEachIndexed { index, seasonBox ->
+            val seasonId = seasonBox.id().ifBlank { seasonBox.attr("data-season") }
+            val season = Regex("\\d+").find(seasonId)?.value?.toIntOrNull() ?: (index + 1)
+            seasonBox.select("a[href*='watch.php?vid=']").forEach { element ->
+                val href = fixUrl(element.attr("href"))
+                val id = Regex("[?&]vid=([a-zA-Z0-9]+)").find(href)?.groupValues?.get(1) ?: return@forEach
                 val label = element.attr("title").ifBlank { element.text() }.trim()
-                label.contains("حلقة", true) ||
-                    Regex("^\\s*\\d+\\s*$").containsMatchIn(label)
+                val number = episodeNumber(label) ?: (episodes.count { it.season == season } + 1)
+                episodes.add(newEpisode(data = "$mainUrl/play.php?vid=$id") {
+                    name = label.ifBlank { "الحلقة $number" }
+                    episode = number
+                    this.season = season
+                    posterUrl = poster
+                })
             }
-            .distinctBy { it.attr("href") }
-
-        if (episodeLinks.isNotEmpty()) {
-            val episodes = episodeLinks.mapIndexed { index, element ->
-                val episodeTitle = element.attr("title").ifBlank { element.text() }.trim()
-                    .ifBlank { "الحلقة " + (index + 1) }
-                val number = Regex("(\\d+)").find(episodeTitle)
-                    ?.groupValues?.getOrNull(1)?.toIntOrNull()
-                newEpisode(data = playerUrl(fixUrl(element.attr("href")))) {
-                    name = if (episodeTitle.contains("حلقة", true)) episodeTitle
-                        else "الحلقة " + (number ?: index + 1)
-                    episode = number ?: (index + 1)
+        }
+        if (episodes.isEmpty()) {
+            val seen = hashSetOf<String>()
+            document.select("a[href*='watch.php?vid=']").forEach { element ->
+                val href = fixUrl(element.attr("href"))
+                val id = Regex("[?&]vid=([a-zA-Z0-9]+)").find(href)?.groupValues?.get(1) ?: return@forEach
+                if (!seen.add(id)) return@forEach
+                val label = element.attr("title").ifBlank { element.text() }.trim()
+                if (!label.contains("حلقة", true) && episodeNumber(label) == null) return@forEach
+                val number = episodeNumber(label) ?: (episodes.size + 1)
+                episodes.add(newEpisode(data = "$mainUrl/play.php?vid=$id") {
+                    name = label.ifBlank { "الحلقة $number" }
+                    episode = number
                     season = 1
                     posterUrl = poster
-                }
-            }.sortedBy { it.episode ?: Int.MAX_VALUE }
-
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                })
+            }
+        }
+        val uniqueEpisodes = episodes.distinctBy { ${it.season}:${it.episode} }
+            .sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
+        if (uniqueEpisodes.isNotEmpty()) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, uniqueEpisodes) {
                 posterUrl = poster
                 plot = description
             }
@@ -122,83 +134,90 @@ class AhwakTV : MainAPI() {
         }
     }
 
+
+    private fun episodeNumber(label: String): Int? {
+        val raw = Regex("[0-9٠-٩]+").find(label)?.value ?: return null
+        return raw.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }.joinToString("").toIntOrNull()
+    }
+
+    private fun unpackPackedJs(source: String): String? {
+        val eval = Regex("eval\\s*\\(\\s*function\\s*\\(.*?\\)\\s*\\{.*?\\}\\s*\\((.*)\\)\\s*\\)",
+            setOf(RegexOption.DOT_MATCHES_ALL)).find(source) ?: return null
+        val args = Regex("['\\"](.*?)['\\"]\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*['\\"](.*?)['\\"]\\.split\\s*\\(['\\"]\\|['\\"]\\)",
+            setOf(RegexOption.DOT_MATCHES_ALL)).find(eval.groupValues[1]) ?: return null
+        val packed = args.groupValues[1]
+        val radix = args.groupValues[2].toIntOrNull() ?: return null
+        val count = args.groupValues[3].toIntOrNull() ?: return null
+        val keys = args.groupValues[4].split('|')
+        val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        fun base(n0: Int): String {
+            if (n0 == 0) return "0"
+            var n = n0
+            val out = StringBuilder()
+            while (n > 0) { out.insert(0, chars[n % radix]); n /= radix }
+            return out.toString()
+        }
+        val map = HashMap<String, String>()
+        for (i in 0 until count) keys.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let { map[base(i)] = it }
+        return Regex("\\b\\w+\\b").replace(packed) { m -> map[m.value] ?: m.value }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val response = app.get(data, referer = "$mainUrl/")
-        val page = response.document
-        val pageUrl = response.url
-        val candidates = linkedMapOf<String, String>()
-
-        fun addCandidate(rawValue: String?, referer: String = pageUrl) {
-            val raw = rawValue?.trim()?.replace("\\/", "/")
-                ?.replace("&amp;", "&")
-                ?.trim('"', '\'', ' ')
-                ?: return
-            if (raw.isBlank() || raw.startsWith("#") || raw.startsWith("javascript:", true)) return
-            val url = fixUrl(raw)
-            if (url.startsWith("http", true)) candidates.putIfAbsent(url, referer)
-        }
-
-        // Read the selected player and every server button/link. AhwakTV may
-        // keep non-selected servers in data-* attributes or inline handlers.
-        page.select("iframe, video, source, a[href], [data-src], [data-url], [data-link], [data-embed], [data-embed-url], [data-video], [data-href], [onclick], [data-server]")
-            .forEach { element ->
-                listOf(
-                    "src", "data-src", "data-lazy-src", "data-url", "data-link",
-                    "data-embed", "data-embed-url", "data-video", "data-href", "href"
-                ).forEach { key ->
-                    if (element.hasAttr(key)) addCandidate(element.attr(key))
-                }
-                if (element.hasAttr("onclick")) {
-                    val handler = element.attr("onclick").replace("\\/", "/")
-                    Regex("""https?://[^\s"'<>]+""").findAll(handler).forEach {
-                        addCandidate(it.value.trimEnd(',', ';', ')', ']'))
-                    }
-                }
+        val id = Regex("[?&]vid=([a-zA-Z0-9]+)").find(data)?.groupValues?.get(1) ?: return false
+        val playUrl = "$mainUrl/play.php?vid=$id"
+        val html = app.get(playUrl, headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36",
+            "Referer" to "$mainUrl/"
+        )).text.replace("\\/", "/").replace("&amp;", "&")
+        val doc = org.jsoup.Jsoup.parse(html, playUrl)
+        val servers = doc.select("li[data-embed]").mapNotNull { item ->
+            val embed = item.attr("data-embed").replace("&quot;", "\"").replace("&#39;", "'")
+            val src = Regex("""src\s*=\s*['"]([^'"]+)['"]""").find(embed)?.groupValues?.get(1)
+                ?: return@mapNotNull null
+            val label = item.text().trim().ifBlank { src.substringAfter("://").substringBefore("/") }
+            label to fixUrl(src)
+        }.distinctBy { it.second }.toMutableList()
+        if (servers.isEmpty()) {
+            doc.select("iframe[src], iframe[data-src], video[src], source[src]").forEach { el ->
+                val src = el.attr("src").ifBlank { el.attr("data-src") }
+                if (src.isNotBlank()) servers.add("Server" to fixUrl(src))
             }
-
-        // Some player templates store their server URLs only in scripts.
-        val html = page.html()
-            .replace("\\/", "/")
-            .replace("\\u0026", "&")
-            .replace("\\u003d", "=")
-            .replace("&amp;", "&")
-        Regex("""https?://[^\s"'<>\\]+""").findAll(html).forEach { match ->
-            addCandidate(match.value.trimEnd(',', ';', ')', ']', '}'))
         }
-        Regex("""(?:src|file|url|link|embed)\s*[:=]\s*['"]([^'"]+)['"]""", RegexOption.IGNORE_CASE)
-            .findAll(html).forEach { addCandidate(it.groupValues[1]) }
-
         var found = false
-        val directSeen = hashSetOf<String>()
-        for ((candidate, referer) in candidates) {
-            if (!directSeen.add(candidate)) continue
-            val host = candidate.substringAfter("://").substringBefore("/").lowercase()
-            val ownHost = host.endsWith("ahwaktv.quest") || host.endsWith("aahwaktv.beer")
-            if (!ownHost && !candidate.contains("ahwaktv", true)) {
-                try {
-                    loadExtractor(candidate, referer, subtitleCallback) { link ->
-                        found = true
-                        callback(link)
-                    }
-                } catch (_: Exception) {
-                    // Continue: a dead server must not block the remaining mirrors.
+        for ((label, link) in servers) {
+            try {
+                if (loadExtractor(link, playUrl, subtitleCallback, callback)) {
+                    found = true
+                    continue
                 }
-            } else if (candidate.contains(".m3u8", true) || candidate.contains(".mp4", true)) {
-                callback(newExtractorLink(
-                    name, name, candidate,
-                    if (candidate.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                ) {
-                    this.referer = referer
-                    quality = Qualities.Unknown.value
-                })
-                found = true
+                val embedHtml = app.get(link, headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                    "Referer" to playUrl
+                )).text
+                val unpacked = unpackPackedJs(embedHtml) ?: embedHtml
+                val file = Regex("""['"]?file['"]?\s*[:=]\s*['"](https?[^'"]+)['"]""")
+                    .find(unpacked)?.groupValues?.get(1)
+                if (file != null) {
+                    val type = when {
+                        file.contains(".m3u8", true) -> ExtractorLinkType.M3U8
+                        file.contains(".mp4", true) -> ExtractorLinkType.VIDEO
+                        else -> ExtractorLinkType.INFERRED
+                    }
+                    callback(newExtractorLink(name, label, file, type) {
+                        referer = link
+                        quality = Qualities.Unknown.value
+                    })
+                    found = true
+                }
+            } catch (_: Exception) {
             }
         }
         return found
     }
+
 }
