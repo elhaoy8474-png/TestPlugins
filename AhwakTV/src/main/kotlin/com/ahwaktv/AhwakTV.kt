@@ -109,9 +109,11 @@ class AhwakTV : MainAPI() {
             "$mainUrl/play.php?vid=$videoId"
         } else {
             val player = document.selectFirst("iframe[src], iframe[data-src]")
-            player?.let {
-                fixUrl(it.attr("src").ifBlank { it.attr("data-src") })
-            } ?: url
+            if (player == null) {
+                url
+            } else {
+                fixUrl(player.attr("src").ifBlank { player.attr("data-src") })
+            }
         }
 
         return newMovieLoadResponse(title, url, TvType.Movie, playerUrl) {
