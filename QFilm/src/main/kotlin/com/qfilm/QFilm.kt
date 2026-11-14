@@ -95,7 +95,7 @@ class QFilm : MainAPI() {
         // QFilm embeds player iframes inside JavaScript strings. Normalize
         // escaped slashes, quotes and HTML entities before parsing them.
         val html = rawHtml
-            .replace("\\\\/", "/")
+            .replace("\\/", "/")
             .replace("\\\"", "\"")
             .replace("\\'", "'")
             .replace("&amp;", "&")
@@ -107,7 +107,7 @@ class QFilm : MainAPI() {
         fun addServer(raw: String) {
             val candidate = raw.trim()
                 .trim('\'', '"')
-                .replace("\\\\/", "/")
+                .replace("\\/", "/")
                 .replace("&amp;", "&")
                 .replace("&#39;", "'")
             if (candidate.startsWith("https://") || candidate.startsWith("http://")) {
@@ -123,7 +123,7 @@ class QFilm : MainAPI() {
                 .ifBlank { element.attr("data-src") }
                 .ifBlank { element.attr("data-embed") }
             if (value.contains("<iframe", true)) {
-                Regex("""src\\s*=\\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                Regex("""src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
                     .find(value)?.groupValues?.get(1)?.let(::addServer)
             } else {
                 addServer(value)
@@ -132,19 +132,19 @@ class QFilm : MainAPI() {
 
         // Player lists are commonly stored as escaped iframe HTML in JS arrays.
         val serverArray = Regex(
-            """(?:var|let|const)\\s+servers\\s*=\\s*\\[(.*?)\\]""",
+            """(?:var|let|const)\s+servers\s*=\s*\[(.*?)\]""",
             setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
         ).find(html)?.groupValues?.get(1).orEmpty()
 
         val searchSources = listOf(serverArray, html)
         for (source in searchSources) {
             Regex(
-                """src\\s*=\\s*\\\\?["'](https?://[^"'\\s<>]+)""",
+                """src\s*=\s*\\?["'](https?://[^"'\s<>]+)""",
                 RegexOption.IGNORE_CASE
             ).findAll(source).forEach { addServer(it.groupValues[1]) }
 
             Regex(
-                """https?://[^"'\\s<>\\\\]+""",
+                """https?://[^"'\s<>\\]+""",
                 RegexOption.IGNORE_CASE
             ).findAll(source).forEach { addServer(it.value) }
         }
