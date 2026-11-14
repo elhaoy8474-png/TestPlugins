@@ -1,0 +1,8 @@
+{
+  "name": "AhwakTV Repository",
+  "description": "مستودع إضافة أهواك تي في لتطبيق Cloudstream",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/plugins.json"
+  ]
+}
