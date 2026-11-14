@@ -33,7 +33,7 @@ class QFilm : MainAPI() {
         val title = anchor.attr("title").ifBlank { anchor.text() }
             .ifBlank { anchor.selectFirst("img")?.attr("alt").orEmpty() }.trim()
         if (title.isBlank()) return null
-        val image = anchor.selectFirst("img") ?: selectFirst("img")
+        val image: Element? = anchor.selectFirst("img") ?: selectFirst("img")
         val poster: String? = image?.let {
             it.attr("data-src").ifBlank { it.attr("data-original") }.ifBlank { it.attr("src") }
         }?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
