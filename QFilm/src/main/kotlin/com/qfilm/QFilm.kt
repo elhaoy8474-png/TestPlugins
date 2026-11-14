@@ -21,8 +21,16 @@ class QFilm : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "$mainUrl/" to "الرئيسية",
-        "$mainUrl/category.php?cat=asian-movies" to "أفلام آسيوية"
+        "$mainUrl/" to "أفلام - الرئيسية",
+        "$mainUrl/category.php?cat=asian-movies" to "أفلام آسيوية",
+        "https://a.qfilm.cam/seriestv" to "المسلسلات - الكل",
+        "https://a.qfilm.cam/category/مسلسلات-عربية" to "مسلسلات عربية",
+        "https://a.qfilm.cam/category/مسلسلات-تركية" to "مسلسلات تركية",
+        "https://a.qfilm.cam/category/مسلسلات-اجنبية" to "مسلسلات أجنبية",
+        "https://a.qfilm.cam/category/مسلسلات-اسيوية" to "مسلسلات آسيوية",
+        "https://a.qfilm.cam/category/مسلسلات-اهواك" to "مسلسلات اهواك",
+        "https://a.qfilm.cam/category/مسلسلات-مصرية" to "مسلسلات مصرية",
+        "https://a.qfilm.cam/category/مسلسلات-هندية" to "مسلسلات هندية"
     )
 
     private fun Element.toResult(): SearchResponse? {
