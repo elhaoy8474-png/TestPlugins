@@ -155,7 +155,7 @@ class AhwakTV : MainAPI() {
                 }
                 if (element.hasAttr("onclick")) {
                     val handler = element.attr("onclick").replace("\\/", "/")
-                    Regex("""https?://[^\\s"'<>]+""").findAll(handler).forEach {
+                    Regex("""https?://[^\s"'<>]+""").findAll(handler).forEach {
                         addCandidate(it.value.trimEnd(',', ';', ')', ']'))
                     }
                 }
@@ -167,10 +167,10 @@ class AhwakTV : MainAPI() {
             .replace("\\u0026", "&")
             .replace("\\u003d", "=")
             .replace("&amp;", "&")
-        Regex("""https?://[^\\s"'<>\\\\]+""").findAll(html).forEach { match ->
+        Regex("""https?://[^\s"'<>\\]+""").findAll(html).forEach { match ->
             addCandidate(match.value.trimEnd(',', ';', ')', ']', '}'))
         }
-        Regex("""(?:src|file|url|link|embed)\\s*[:=]\\s*['"]([^'"]+)['"]""", RegexOption.IGNORE_CASE)
+        Regex("""(?:src|file|url|link|embed)\s*[:=]\s*['"]([^'"]+)['"]""", RegexOption.IGNORE_CASE)
             .findAll(html).forEach { addCandidate(it.groupValues[1]) }
 
         var found = false
