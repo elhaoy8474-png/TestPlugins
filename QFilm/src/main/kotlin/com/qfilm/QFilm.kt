@@ -106,7 +106,7 @@ class QFilm : MainAPI() {
 
         fun addServer(raw: String) {
             val candidate = raw.trim()
-                .trim('\\'', '"')
+                .trim('\'', '"')
                 .replace("\\\\/", "/")
                 .replace("&amp;", "&")
                 .replace("&#39;", "'")
