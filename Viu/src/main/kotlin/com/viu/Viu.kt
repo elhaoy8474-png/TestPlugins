@@ -202,7 +202,7 @@ class Viu : MainAPI() {
                 posterUrl = poster(item) ?: image
             })
         }
-        val sorted = episodes.sortedWith(compareBy<Episode> { it.episode ?: Int.MAX_VALUE })
+        val sorted = episodes.sortedWith(compareBy<Episode> { it.episode ?: Int.MAX_VALUE }).toMutableList()
         if (sorted.isEmpty()) {
             val number = current.optString("number").toIntOrNull()
             sorted.add(newEpisode("viu://product/$id") {
