@@ -137,25 +137,35 @@ class QFilm : MainAPI() {
                     ?: doc.selectFirst("h1")?.text()?.trim() ?: doc.title()
                 val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }
                 val plot = doc.selectFirst("meta[name=description]")?.attr("content")
+                // Filter out recommendation cards: only keep links whose URL belongs to this series.
+                val seriesSlug = try { URI(seriesUrl).path.trimEnd('/').substringAfterLast('/').lowercase() } catch (_: Exception) { "" }
+                val episodeContainers = doc.select(
+                    ".episodes-list, .episode-list, .episodes, .all-episodes, .season-episodes, #episodes, #episode-list"
+                )
+                val episodeRoot = episodeContainers.firstOrNull() ?: doc
                 val seen = hashSetOf<String>()
-                val episodes = doc.select("a[href]").mapNotNull { a ->
+                val episodes = episodeRoot.select("a[href]").mapNotNull { a ->
                     val href = a.attr("href")
-                    if (!href.contains("qdrama-")) return@mapNotNull null
-                    val episodeUrl = a.absUrl("href").ifBlank { try { URI("https://a.qfilm.cam").resolve(href).toString() } catch (_: Exception) { href } }
+                    if (!href.contains("qdrama-", true)) return@mapNotNull null
+                    val episodeUrl = a.absUrl("href").ifBlank {
+                        try { URI("https://a.qfilm.cam").resolve(href).toString() }
+                        catch (_: Exception) { href }
+                    }
+                    val episodePath = try { URI(episodeUrl).path.lowercase() } catch (_: Exception) { episodeUrl.lowercase() }
+                    if (seriesSlug.isNotBlank() && !episodePath.contains(seriesSlug)) return@mapNotNull null
                     val label = a.attr("title").ifBlank { a.text() }.trim()
-                    if (label.isBlank() || !seen.add(episodeUrl)) return@mapNotNull null
-                    episodeUrl to label
-                }.mapIndexed { index, item ->
-                    val number = episodeNumber(item.second, item.first) ?: (index + 1)
-                    val seasonMatch = Regex("(?i)(?:الموسم|season)\\s*(\\d+)").find(item.second)
-                    newEpisode(data = item.first) {
-                        name = item.second
-                        episode = number
-                        season = seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                    if (!seen.add(episodeUrl)) return@mapNotNull null
+                    val seasonMatch = Regex("(?i)(?:الموسم|season)\\s*(\\d+)").find(label)
+                    val number = episodeNumber(label, episodeUrl)
+                    Triple(episodeUrl to label, number, seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1)
+                }.map { item ->
+                    newEpisode(data = item.first.first) {
+                        name = item.first.second.ifBlank { "الحلقة " + (item.second?.toString() ?: "") }
+                        episode = item.second
+                        season = item.third
                         posterUrl = poster
                     }
-                }
-                    .sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
+                }.sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
                 return newTvSeriesLoadResponse(title, seriesUrl, TvType.TvSeries, episodes) {
                     posterUrl = poster
                     this.plot = plot
@@ -244,7 +254,8 @@ class QFilm : MainAPI() {
         val patterns = listOf(
             Regex("(?i)الحلقة\\s*#?\\s*(\\d+)"),
             Regex("(?i)episode\\s*#?\\s*(\\d+)"),
-            Regex("(?i)ep\\.?\\s*#?\\s*(\\d+)")
+            Regex("(?i)ep\\.?\\s*#?\\s*(\\d+)"),
+            Regex("(?i)[-_/]s(\\d+)(?:\\.html?)?/?$")
         )
         return patterns.firstNotNullOfOrNull { it.find(text)?.groupValues?.get(1)?.toIntOrNull() }
     }
