@@ -54,6 +54,84 @@ jobs:
           find . -type f -name '*.cs3' -exec cp {} "$GITHUB_WORKSPACE/builds/" \;
           cp build/plugins.json "$GITHUB_WORKSPACE/builds/plugins.json"
 
+
+      - name: Package AhwakTV source
+        run: |
+          PACKAGE="$GITHUB_WORKSPACE/artifacts/AhwakTV-Source"
+          mkdir -p "$PACKAGE"
+          cp -R "$GITHUB_WORKSPACE/src/AhwakTV" "$PACKAGE/"
+          cp "$GITHUB_WORKSPACE/src/build.gradle.kts" "$PACKAGE/"
+          cp "$GITHUB_WORKSPACE/src/settings.gradle.kts" "$PACKAGE/"
+          cp "$GITHUB_WORKSPACE/src/gradle.properties" "$PACKAGE/"
+          cp "$GITHUB_WORKSPACE/src/gradlew" "$PACKAGE/"
+          cp "$GITHUB_WORKSPACE/src/gradlew.bat" "$PACKAGE/"
+          cp -R "$GITHUB_WORKSPACE/src/gradle" "$PACKAGE/"
+          cat > "$PACKAGE/README-AR.md" <<'EOF'
+          # إضافة AhwakTV
+
+          مشروع مصدر مستقل لإضافة أهواك تي في المتوافقة مع واجهة CloudStream التي يستخدمها KodaStream.
+
+          ## البناء
+          - JDK 17
+          - Gradle Wrapper 8.12 المرفق
+          - Android SDK Platform 35 وBuild Tools 35
+          - Android Gradle Plugin 8.7.3 وKotlin Gradle Plugin 2.4.0 كما في ملف البناء المرجعي
+
+          من جذر المشروع نفّذ:
+          ```bash
+          ./gradlew --no-daemon :AhwakTV:make
+          ```
+
+          لإعادة بناء كل الإضافات وإنشاء قائمة المستودع:
+          ```bash
+          ./gradlew --no-daemon make makePluginsJson
+          ```
+
+          ينتج ملف `.cs3` داخل مجلد بناء وحدة AhwakTV. يتم توليد `manifest.json` داخل الحزمة بواسطة إضافة Gradle من التعليمة `@CloudstreamPlugin` على الصنف `com.ahwaktv.AhwakTVPlugin`.
+
+          ## إضافة المستودع إلى KodaStream
+          استخدم رابط المستودع:
+          `https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/repo.json`
+
+          ## النطاق
+          - الصفحة الرئيسية، قائمة المسلسلات، الجديد، والأكثر مشاهدة.
+          - فهرس التصنيفات وصفحات التصنيف.
+          - البحث عبر نموذج البحث الذي يقدمه الموقع إذا كان موجوداً في الصفحة.
+          - تفاصيل المسلسل والحلقات والمواسم، مع تجميع الحلقات بحسب اسم المسلسل وترتيبها رقمياً.
+          - استخراج روابط الفيديو العامة الظاهرة في عناصر iframe/video/source، وتمرير مشغلات التضمين إلى ExtractorApi المسجل في التطبيق.
+          - لا تتجاوز الإضافة تسجيل الدخول أو CAPTCHA أو أي قيود وصول، ولا تنشئ روابط تشغيل غير موجودة في الصفحة.
+
+          ## حالة الاختبار
+          نجاح بناء Gradle والتحقق من إنشاء ملف `.cs3` وقائمة `plugins.json` لا يثبت وحده أن كل خادم فيديو يعمل داخل التطبيق. يلزم اختبار تشغيل فعلي على KodaStream مع صفحة/حلقة متاحة.
+          EOF
+          cat > "$PACKAGE/manifest-reference.json" <<'EOF'
+          {
+            "name": "AhwakTV",
+            "pluginClassName": "com.ahwaktv.AhwakTVPlugin",
+            "requiresResources": false,
+            "version": 4
+          }
+          EOF
+          cat > "$PACKAGE/BUILD-REPORT.md" <<EOF
+          # تقرير بناء AhwakTV
+          - Commit: $GITHUB_SHA
+          - Workflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          - Build: Gradle task `make` and `makePluginsJson`
+          - Runtime playback: not verified by CI; test on KodaStream is still required.
+          EOF
+          cd "$GITHUB_WORKSPACE/artifacts"
+          zip -qr AhwakTV-Source.zip AhwakTV-Source
+
+      - name: Upload AhwakTV source and plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: AhwakTV-Package-${{ github.run_number }}
+          path: |
+            artifacts/AhwakTV-Source.zip
+            builds/AhwakTV.cs3
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Publish builds
         working-directory: builds
         run: |
