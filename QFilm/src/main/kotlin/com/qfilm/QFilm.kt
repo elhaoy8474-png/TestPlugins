@@ -214,6 +214,17 @@ class QFilm : MainAPI() {
     private fun jsonString(json: String, key: String): String? =
         Regex(""""${key}"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1)
 
+    private fun episodeNumber(label: String, url: String = ""): Int? {
+        val text = "$label $url".map {
+            if (it in '\u0660'..'\u0669') ('0' + (it - '\u0660')) else it
+        }.joinToString("")
+        val patterns = listOf(
+            Regex("(?i)الحلقة\\s*#?\\s*(\\d+)"),
+            Regex("(?i)episode\\s*#?\\s*(\\d+)"),
+            Regex("(?i)ep\\.?\\s*#?\\s*(\\d+)")
+        )
+        return patterns.firstNotNullOfOrNull { it.find(text)?.groupValues?.get(1)?.toIntOrNull() }
+    }
     private fun decodeUrlBase64(value: String): ByteArray {
         val normalized = value.replace('-', '+').replace('_', '/')
         val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
