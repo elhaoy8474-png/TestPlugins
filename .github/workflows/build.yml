@@ -116,7 +116,7 @@ jobs:
           # تقرير بناء AhwakTV
           - Commit: $GITHUB_SHA
           - Workflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-          - Build: Gradle task `make` and `makePluginsJson`
+          - Build: Gradle tasks make and makePluginsJson
           - Runtime playback: not verified by CI; test on KodaStream is still required.
           EOF
           cd "$GITHUB_WORKSPACE/artifacts"
