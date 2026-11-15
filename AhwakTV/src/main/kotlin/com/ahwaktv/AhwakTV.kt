@@ -84,12 +84,13 @@ class AhwakTV : MainAPI() {
 
         if (isCategory) {
             val kind = categoryType(url, title) ?: TvType.TvSeries
-            val results = media(doc, kind)
+            val mediaResults = media(doc, kind)
+            val subcategories = relatedCategories(doc)
 
             // A category that contains one series (for example "Friends - all seasons")
             // is treated as a series collection, not as a generic category page.
-            if (kind != TvType.Movie && results.size == 1) {
-                val seriesName = results.first().name
+            if (kind != TvType.Movie && subcategories.isEmpty() && mediaResults.size == 1) {
+                val seriesName = mediaResults.first().name
                 val extraDocs = categoryPages(url, doc)
                 val allEpisodes = episodes(doc, poster, seriesName, extraDocs = extraDocs)
                 if (allEpisodes.isNotEmpty()) {
@@ -100,6 +101,7 @@ class AhwakTV : MainAPI() {
                 }
             }
 
+            val results = (subcategories + mediaResults).distinctBy { it.url }
             return if (kind == TvType.Movie) {
                 newMovieLoadResponse(title, url, TvType.Movie, "") {
                     posterUrl = poster
@@ -190,6 +192,31 @@ class AhwakTV : MainAPI() {
             name.contains("keyword") || it.attr("placeholder").contains("بحث") || it.attr("placeholder").contains("search", true))
     } ?: form.select("input[type=text][name]").firstOrNull {
         it.attr("name").lowercase() !in setOf("username", "user", "email", "login")
+    }
+
+    private fun relatedCategories(doc: Document): List<SearchResponse> {
+        val heading = doc.select("h1,h2,h3,h4,h5,h6").firstOrNull {
+            it.text().contains("تصنيفات مشابهة") ||
+                it.text().contains("similar categories", ignoreCase = true)
+        } ?: return emptyList()
+
+        val container = heading.parents().firstOrNull { parent ->
+            val count = parent.select("a[href*='category.php'][href*='cat=']").size
+            count in 1..15
+        } ?: return emptyList()
+
+        val seen = hashSetOf<String>()
+        return container.select("a[href*='category.php'][href*='cat=']").mapNotNull { a ->
+            val url = a.absUrl("href")
+            val title = titleOf(a)
+            if (!siteUrl(url) || title.length < 2 || !seen.add(url)) return@mapNotNull null
+            val kind = categoryType(url, title) ?: TvType.TvSeries
+            if (kind == TvType.Movie) {
+                newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = posterOf(a) }
+            } else {
+                newTvSeriesSearchResponse(title, url, kind) { posterUrl = posterOf(a) }
+            }
+        }
     }
 
     private fun categories(doc: Document): List<SearchResponse> {
