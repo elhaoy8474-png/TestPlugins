@@ -2,540 +2,222 @@ package com.ahwaktv
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.net.URLEncoder
 
 class AhwakTV : MainAPI() {
+    override var mainUrl = "https://ahwaktv.quest"
     override var name = "AhwakTV"
-    override var mainUrl = "https://yam.ahwaktv.net"
-    override var lang = "ar"
     override val hasMainPage = true
-    override val hasQuickSearch = true
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime, TvType.Cartoon)
-    private val headers = mapOf("User-Agent" to USER_AGENT)
+    override var lang = "ar"
+    override val hasDownloadSupport = true
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
-        "$mainUrl/" to "الرئيسية",
-        "$mainUrl/moslslat.php" to "المسلسلات",
-        "$mainUrl/category.php" to "التصنيفات",
-        "$mainUrl/category.php?cat=aflam-arabya1" to "أفلام عربي",
-        "$mainUrl/category.php?cat=moslslat-ahwak" to "مسلسلات أهواك",
-        "$mainUrl/newvideos.php" to "الجديد",
+        "$mainUrl/newvideos.php" to "الأحدث",
         "$mainUrl/topvideos.php" to "الأكثر مشاهدة",
+        "$mainUrl/movies.php" to "أفلام",
+        "$mainUrl/all-series.php" to "مسلسلات",
+        "$mainUrl/category.php?cat=msrheat" to "مسرحيات",
+        "$mainUrl/category.php?cat=aflam-hnde" to "أفلام هندي",
+        "$mainUrl/category.php?cat=aflam-mdbljh" to "أفلام مدبلجة",
+        "$mainUrl/category.php?cat=mslslat-aseweh" to "مسلسلات آسيوية"
     )
 
+    private fun Element.toSearchResult(): SearchResponse? {
+        val link = if (tagName() == "a" && attr("href").contains("watch.php")) this
+        else selectFirst("a[href*='watch.php?vid=']") ?: selectFirst("a[href]") ?: return null
+        val title = link.attr("title").ifBlank { link.text() }.trim()
+        if (title.isBlank()) return null
+        val href = fixUrl(link.attr("href"))
+        val image = selectFirst("img") ?: link.selectFirst("img")
+        val poster = fixUrlNull(image?.attr("data-src")?.takeIf { it.isNotBlank() }
+            ?: image?.attr("data-original")?.takeIf { it.isNotBlank() }
+            ?: image?.attr("src"))
+        val isSeries = title.contains("مسلسل", true) && !title.contains("الحلقة", true)
+        return if (isSeries) newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+            posterUrl = poster
+        } else newMovieSearchResponse(title, href, TvType.Movie) {
+            posterUrl = poster
+        }
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val source = if (isCategoryIndex(request.data)) mainUrl else request.data
-        var doc = app.get(source, headers = headers).document
-        if (page > 1 && !isCategoryIndex(request.data)) {
-            for (p in 2..page) {
-                val next = pageUrl(doc, p) ?: nextUrl(doc) ?: break
-                if (next == doc.location()) break
-                doc = app.get(next, headers = headers, referer = doc.location()).document
-            }
-        }
-        val items = if (isCategoryIndex(request.data)) categories(doc) else media(doc, categoryType(request.data))
-        return newHomePageResponse(request, items, !isCategoryIndex(request.data) && hasNext(doc, page))
+        val document = app.get(request.data).document
+        val results = document.select("a[href*='watch.php?vid='], .pm-video-thumb, .pm-ul-browse-videos li")
+            .mapNotNull { element ->
+                (if (element.tagName() == "a") element.parent() ?: element else element).toSearchResult()
+            }.distinctBy { it.url }
+        return newHomePageResponse(request.name, results)
     }
 
-    override suspend fun search(query: String, page: Int): SearchResponseList? {
-        val home = app.get(mainUrl, headers = headers).document
-        val form = home.select("form").firstOrNull { searchInput(it) != null } ?: return null
-        val input = searchInput(form) ?: return null
-        val field = input.attr("name").takeIf { it.isNotBlank() } ?: return null
-        val action = form.absUrl("action").ifBlank { mainUrl }
-        if (!siteUrl(action)) return null
-        val values = linkedMapOf<String, String>()
-        form.select("input[name]").forEach {
-            if (it.attr("type").lowercase() !in setOf("submit", "button", "password", "file", "hidden", "checkbox", "radio")) {
-                values[it.attr("name")] = it.attr("value")
-            }
-        }
-        form.select("input[type=hidden][name]").forEach { values[it.attr("name")] = it.attr("value") }
-        values[field] = query
-        var doc = if (form.attr("method").equals("post", true)) {
-            app.post(action, headers = headers, data = values, referer = mainUrl).document
-        } else {
-            app.get(queryUrl(action, values), headers = headers, referer = mainUrl).document
-        }
-        if (page > 1) for (p in 2..page) {
-            val next = pageUrl(doc, p) ?: nextUrl(doc) ?: break
-            if (next == doc.location()) break
-            doc = app.get(next, headers = headers, referer = doc.location()).document
-        }
-        return newSearchResponseList(media(doc), hasNext(doc, page))
+    override suspend fun search(query: String): List<SearchResponse> {
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val document = app.get("$mainUrl/search.php?keywords=$encoded").document
+        return document.select("a[href*='watch.php?vid='], .pm-video-thumb, .pm-ul-browse-videos li")
+            .mapNotNull { element ->
+                (if (element.tagName() == "a") element.parent() ?: element else element).toSearchResult()
+            }.distinctBy { it.url }
     }
 
-    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query, 1)?.items
+    private fun playerUrl(watchUrl: String): String {
+        val id = Regex("[?&]vid=([^&]+)").find(watchUrl)?.groupValues?.getOrNull(1)
+        return if (id.isNullOrBlank()) watchUrl else "$mainUrl/play.php?vid=$id"
+    }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(url, headers = headers, referer = mainUrl).document
-        val title = doc.selectFirst("h1")?.text()?.trim()?.takeIf { it.isNotBlank() }
-            ?: doc.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
-                ?.takeIf { it.isNotBlank() }
-            ?: doc.title().substringBefore(" - ").trim().ifBlank { "AhwakTV" }
-        val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?.let { image -> if (image.startsWith("http")) image else mainUrl + "/" + image.trimStart('/') }
-        val plot = doc.selectFirst("meta[name=description]")?.attr("content")?.trim()
-        val path = url.substringBefore('?').substringAfterLast('/')
-        val isCategory = path == "category.php" && url.substringAfter('?', "").contains("cat=")
+        val document = app.get(url).document
+        val headings = document.select("h1, .pm-video-title")
+            .map { it.text().trim() }
+            .filter { it.isNotBlank() }
 
-        if (isCategory) {
-            val kind = categoryType(url, title) ?: TvType.TvSeries
-            val mediaResults = media(doc, kind)
-            val subcategories = relatedCategories(doc)
-
-            // A category that contains one series (for example "Friends - all seasons")
-            // is treated as a series collection, not as a generic category page.
-            if (kind != TvType.Movie && subcategories.isEmpty() && mediaResults.size == 1) {
-                val seriesName = mediaResults.first().name
-                val extraDocs = categoryPages(url, doc)
-                val allEpisodes = episodes(doc, poster, seriesName, extraDocs = extraDocs)
-                if (allEpisodes.isNotEmpty()) {
-                    return newTvSeriesLoadResponse(seriesName, url, kind, allEpisodes) {
-                        posterUrl = poster
-                        this.plot = plot
-                    }
-                }
-            }
-
-            val results = (subcategories + mediaResults).distinctBy { it.url }
-            return if (kind == TvType.Movie) {
-                newMovieLoadResponse(title, url, TvType.Movie, "") {
-                    posterUrl = poster
-                    this.plot = plot
-                    recommendations = results
-                }
-            } else {
-                newTvSeriesLoadResponse(title, url, kind, emptyList()) {
-                    posterUrl = poster
-                    this.plot = plot
-                    recommendations = results
-                }
-            }
+        // AhwakTV puts the episode title first and the series title in a
+        // second heading. Prefer the heading that is not an episode title.
+        val seriesHeading = headings.firstOrNull {
+            !it.contains("الحلقة", true) && !it.contains("حلقة", true)
         }
+        val pageTitle = headings.firstOrNull()
+            ?: document.title().substringBefore(" HD").trim().ifBlank { "Unknown" }
+        val title = seriesHeading ?: pageTitle
+            .replace(Regex("\\s+الحلقة\\s+\\d+.*$", RegexOption.IGNORE_CASE), "")
+            .trim()
 
-        if (path == "view-serie.php") {
-            val kind = typeOf(title, TvType.TvSeries) ?: TvType.TvSeries
-            val episodeList = episodes(doc, poster, title)
-            return newTvSeriesLoadResponse(title, url, kind, episodeList) {
-                posterUrl = poster
-                this.plot = plot
-            }
-        }
+        val poster = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
+        val description = document.selectFirst("meta[name=description]")?.attr("content")
 
-        if (path == "watch.php" && (hasEpisodeSection(doc) || isSeriesTitle(title))) {
-            val seriesName = seriesTitleFromPage(doc, title)
-            val kind = typeOf(seriesName, typeOf(title, TvType.TvSeries) ?: TvType.TvSeries)
-                ?: TvType.TvSeries
-            val episodeList = episodes(doc, poster, seriesName, url)
-            return newTvSeriesLoadResponse(seriesName, url, kind, episodeList) {
-                posterUrl = poster
-                this.plot = plot
-            }
-        }
-
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            posterUrl = poster
-            this.plot = plot
-        }
-    }
-
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit,
-    ): Boolean {
-        if (!http(data)) return false
-
-        val doc = app.get(data, headers = headers, referer = mainUrl).document
-        val candidates = linkedMapOf<String, String>()
-        doc.select("iframe[src], iframe[data-src], video[src], video[data-src], video source[src], source[src]")
-            .forEachIndexed { i, el ->
-                val src = absolute(el, "src").ifBlank { absolute(el, "data-src") }
-                if (http(src)) candidates.putIfAbsent(src, el.attr("title").ifBlank { "Server ${i + 1}" })
-            }
-        doc.select(".server a[href], .servers a[href], .embed_server a[href], .player a[href], [data-server] a[href]")
-            .forEachIndexed { i, el ->
-                val src = el.absUrl("href")
-                if (http(src)) candidates.putIfAbsent(src, el.text().trim().ifBlank { "Server ${i + 1}" })
-            }
-
-        var emitted = 0
-        val emit: (ExtractorLink) -> Unit = { link ->
-            emitted += 1
-            callback(link)
-        }
-
-        for ((src, label) in candidates) {
-            val type = streamType(src)
-            if (type != null) {
-                emit(newExtractorLink("AhwakTV", label, src, type) {
-                    referer = data
-                    quality = Qualities.Unknown.value
-                    this.headers = this@AhwakTV.headers
-                })
-            } else {
-                loadExtractor(src, data, subtitleCallback, emit)
-            }
-        }
-        return emitted > 0
-    }
-
-    private fun searchInput(form: Element): Element? = form.select("input").firstOrNull {
-        val type = it.attr("type").lowercase()
-        val name = it.attr("name").lowercase()
-        type != "hidden" && (type == "search" || name.contains("search") || name in setOf("q", "s", "story") ||
-            name.contains("keyword") || it.attr("placeholder").contains("بحث") || it.attr("placeholder").contains("search", true))
-    } ?: form.select("input[type=text][name]").firstOrNull {
-        it.attr("name").lowercase() !in setOf("username", "user", "email", "login")
-    }
-
-    private fun relatedCategories(doc: Document): List<SearchResponse> {
-        val heading = doc.select("h1,h2,h3,h4,h5,h6").firstOrNull {
-            it.text().contains("تصنيفات مشابهة") ||
-                it.text().contains("similar categories", ignoreCase = true)
-        } ?: return emptyList()
-
-        val container = heading.parents().firstOrNull { parent ->
-            val count = parent.select("a[href*='category.php'][href*='cat=']").size
-            count in 1..15
-        } ?: return emptyList()
-
-        val seen = hashSetOf<String>()
-        return container.select("a[href*='category.php'][href*='cat=']").mapNotNull { a ->
-            val url = a.absUrl("href")
-            val title = titleOf(a)
-            if (!siteUrl(url) || title.length < 2 || !seen.add(url)) return@mapNotNull null
-            val kind = categoryType(url, title) ?: TvType.TvSeries
-            if (kind == TvType.Movie) {
-                newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = posterOf(a) }
-            } else {
-                newTvSeriesSearchResponse(title, url, kind) { posterUrl = posterOf(a) }
-            }
-        }
-    }
-
-    private fun categories(doc: Document): List<SearchResponse> {
-        val seen = hashSetOf<String>()
-        return doc.select("a[href]").mapNotNull { a ->
-            val url = a.absUrl("href")
-            if (!siteUrl(url) || !url.contains("category.php") ||
-                !url.substringAfter('?', "").contains("cat=")) return@mapNotNull null
-            val title = titleOf(a)
-            if (title.length < 2 || !seen.add(url)) return@mapNotNull null
-            val kind = categoryType(url, title) ?: TvType.TvSeries
-            if (kind == TvType.Movie) {
-                newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = posterOf(a) }
-            } else {
-                newTvSeriesSearchResponse(title, url, kind) { posterUrl = posterOf(a) }
-            }
-        }
-    }
-
-    private fun media(doc: Document, fallbackType: TvType? = null): List<SearchResponse> {
-        val seenUrls = hashSetOf<String>()
-        val seenSeries = hashSetOf<String>()
-        val results = mutableListOf<SearchResponse>()
-
-        for (a in doc.select("a[href]")) {
-            val url = a.absUrl("href")
-            if (!siteUrl(url)) continue
-            val path = url.substringBefore('?').substringAfterLast('/').lowercase()
-            if (path !in setOf("view-serie.php", "watch.php")) continue
-
-            val title = titleOf(a)
-            if (title.length < 2) continue
-
-            if (path == "view-serie.php") {
-                if (!seenUrls.add(url)) continue
-                val seriesName = baseSeriesTitle(title).ifBlank { title }
-                val key = normalizeTitle(seriesName)
-                if (key.isBlank() || !seenSeries.add(key)) continue
-                val kind = typeOf(title, fallbackType ?: TvType.TvSeries) ?: TvType.TvSeries
-                results += newTvSeriesSearchResponse(seriesName, url, kind) {
-                    posterUrl = posterOf(a)
-                }
-                continue
-            }
-
-            val kind = typeOf(title, fallbackType) ?: TvType.Movie
-            if (kind == TvType.Movie) {
-                if (!seenUrls.add(url)) continue
-                results += newMovieSearchResponse(title, url, TvType.Movie) {
-                    posterUrl = posterOf(a)
-                }
-            } else {
-                val seriesName = baseSeriesTitle(title).ifBlank { title }
-                val key = normalizeTitle(seriesName)
-                if (key.isBlank() || !seenSeries.add(key)) continue
-                results += newTvSeriesSearchResponse(seriesName, url, kind) {
-                    posterUrl = posterOf(a)
-                }
-            }
-        }
-
-        return results
-    }
-
-    private fun episodes(
-        doc: Document,
-        poster: String?,
-        seriesName: String?,
-        currentUrl: String? = null,
-        extraDocs: List<Document> = emptyList(),
-    ): List<Episode> {
-        val result = linkedMapOf<String, Episode>()
-        val counts = hashMapOf<Int, Int>()
-        val seriesKey = normalizeTitle(seriesName.orEmpty())
-
-        for (sourceDoc in listOf(doc) + extraDocs) {
-            val pageHasEpisodes = hasEpisodeSection(sourceDoc)
-            for (a in sourceDoc.select("a[href*='watch.php']")) {
-                val url = a.absUrl("href")
-                if (!siteUrl(url)) continue
-
-                val label = titleOf(a).ifBlank { a.text().trim() }
-                val numberFromLabel = episodeNumber(label)
-                val episodeOnly = label.matches(Regex("""^\s*[0-9٠-٩۰-۹]+\s*(?:حلقة|الحلقة)?\s*$"""))
-                val inEpisodeSection = pageHasEpisodes && episodeOnly
-                val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
-
-                if (seriesName != null && !sameSeries && !inEpisodeSection) continue
-                if (label.isBlank() && !episodeOnly) continue
-
-                val context = a.parents().take(6).joinToString(" ") {
-                    it.id() + " " + it.classNames().joinToString(" ") + " " +
-                        it.attr("data-season") + " " +
-                        (it.selectFirst("h2,h3,h4")?.text() ?: "")
-                }
-                val season = seasonNumber(context) ?: seasonNumber(label) ?: 1
-                val nextIndex = (counts[season] ?: 0) + 1
-                val number = numberFromLabel ?: nextIndex
-                counts[season] = maxOf(nextIndex, number)
-                val displayName = if (episodeOnly) "الحلقة $number" else label
-
-                result.putIfAbsent(url, newEpisode(url) {
-                    name = displayName
+        val episodes = mutableListOf<Episode>()
+        // Keep each season in its own container: episode 1 in season 2 is not a duplicate.
+        document.select("div[id^=Season], section[id^=Season], [data-season]").forEachIndexed { index, seasonBox ->
+            val seasonId = seasonBox.id().ifBlank { seasonBox.attr("data-season") }
+            val season = Regex("\\d+").find(seasonId)?.value?.toIntOrNull() ?: (index + 1)
+            seasonBox.select("a[href*='watch.php?vid=']").forEach { element ->
+                val href = fixUrl(element.attr("href"))
+                val id = Regex("[?&]vid=([a-zA-Z0-9]+)").find(href)?.groupValues?.get(1) ?: return@forEach
+                val label = element.attr("title").ifBlank { element.text() }.trim()
+                val number = episodeNumber(label) ?: (episodes.count { it.season == season } + 1)
+                episodes.add(newEpisode(data = "$mainUrl/play.php?vid=$id") {
+                    name = label.ifBlank { "الحلقة $number" }
                     episode = number
                     this.season = season
                     posterUrl = poster
                 })
             }
         }
-
-        if (currentUrl != null && siteUrl(currentUrl) && !result.containsKey(currentUrl)) {
-            val currentTitle = doc.selectFirst("h1")?.text()?.trim().orEmpty()
-            val number = episodeNumber(currentTitle) ?: 1
-            result[currentUrl] = newEpisode(currentUrl) {
-                name = currentTitle.ifBlank { "الحلقة $number" }
-                episode = number
-                season = seasonNumber(currentTitle) ?: 1
+        if (episodes.isEmpty()) {
+            val seen = hashSetOf<String>()
+            document.select("a[href*='watch.php?vid=']").forEach { element ->
+                val href = fixUrl(element.attr("href"))
+                val id = Regex("[?&]vid=([a-zA-Z0-9]+)").find(href)?.groupValues?.get(1) ?: return@forEach
+                if (!seen.add(id)) return@forEach
+                val label = element.attr("title").ifBlank { element.text() }.trim()
+                if (!label.contains("حلقة", true) && episodeNumber(label) == null) return@forEach
+                val number = episodeNumber(label) ?: (episodes.size + 1)
+                episodes.add(newEpisode(data = "$mainUrl/play.php?vid=$id") {
+                    name = label.ifBlank { "الحلقة $number" }
+                    episode = number
+                    season = 1
+                    posterUrl = poster
+                })
+            }
+        }
+        val uniqueEpisodes = episodes.distinctBy { "${it.season}:${it.episode}" }
+            .sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
+        if (uniqueEpisodes.isNotEmpty()) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, uniqueEpisodes) {
                 posterUrl = poster
+                plot = description
             }
         }
 
-        return result.values.sortedWith(
-            compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE }
-        )
+        return newMovieLoadResponse(pageTitle, url, TvType.Movie, playerUrl(url)) {
+            posterUrl = poster
+            plot = description
+        }
     }
 
-    private suspend fun categoryPages(url: String, firstDoc: Document): List<Document> {
-        val pages = mutableListOf<Document>()
-        val visited = hashSetOf(firstDoc.location().ifBlank { url })
-        var current = firstDoc
 
-        for (page in 2..20) {
-            val next = pageUrl(current, page) ?: nextUrl(current) ?: break
-            if (!siteUrl(next) || !visited.add(next)) break
-            val nextDoc = try {
-                app.get(next, headers = headers, referer = current.location().ifBlank { url }).document
+    private fun episodeNumber(label: String): Int? {
+        val raw = Regex("[0-9٠-٩]+").find(label)?.value ?: return null
+        return raw.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }.joinToString("").toIntOrNull()
+    }
+
+    private fun unpackPackedJs(source: String): String? {
+        val eval = Regex("eval\\s*\\(\\s*function\\s*\\(.*?\\)\\s*\\{.*?\\}\\s*\\((.*)\\)\\s*\\)",
+            setOf(RegexOption.DOT_MATCHES_ALL)).find(source) ?: return null
+        val args = Regex("""['"](.*?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"](.*?)['"]\.split\s*\(['"]\|['"]\)""",
+            setOf(RegexOption.DOT_MATCHES_ALL)).find(eval.groupValues[1]) ?: return null
+        val packed = args.groupValues[1]
+        val radix = args.groupValues[2].toIntOrNull() ?: return null
+        val count = args.groupValues[3].toIntOrNull() ?: return null
+        val keys = args.groupValues[4].split('|')
+        val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        fun base(n0: Int): String {
+            if (n0 == 0) return "0"
+            var n = n0
+            val out = StringBuilder()
+            while (n > 0) { out.insert(0, chars[n % radix]); n /= radix }
+            return out.toString()
+        }
+        val map = HashMap<String, String>()
+        for (i in 0 until count) keys.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let { map[base(i)] = it }
+        return Regex("\\b\\w+\\b").replace(packed) { m -> map[m.value] ?: m.value }
+    }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val id = Regex("[?&]vid=([a-zA-Z0-9]+)").find(data)?.groupValues?.get(1) ?: return false
+        val playUrl = "$mainUrl/play.php?vid=$id"
+        val html = app.get(playUrl, headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36",
+            "Referer" to "$mainUrl/"
+        )).text.replace("\\/", "/").replace("&amp;", "&")
+        val doc = org.jsoup.Jsoup.parse(html, playUrl)
+        val servers = doc.select("li[data-embed]").mapNotNull { item ->
+            val embed = item.attr("data-embed").replace("&quot;", "\"").replace("&#39;", "'")
+            val src = Regex("""src\s*=\s*['"]([^'"]+)['"]""").find(embed)?.groupValues?.get(1)
+                ?: return@mapNotNull null
+            val label = item.text().trim().ifBlank { src.substringAfter("://").substringBefore("/") }
+            label to fixUrl(src)
+        }.distinctBy { it.second }.toMutableList()
+        if (servers.isEmpty()) {
+            doc.select("iframe[src], iframe[data-src], video[src], source[src]").forEach { el ->
+                val src = el.attr("src").ifBlank { el.attr("data-src") }
+                if (src.isNotBlank()) servers.add("Server" to fixUrl(src))
+            }
+        }
+        var found = false
+        for ((label, link) in servers) {
+            try {
+                if (loadExtractor(link, playUrl, subtitleCallback, callback)) {
+                    found = true
+                    continue
+                }
+                val embedHtml = app.get(link, headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                    "Referer" to playUrl
+                )).text
+                val unpacked = unpackPackedJs(embedHtml) ?: embedHtml
+                val file = Regex("""['"]?file['"]?\s*[:=]\s*['"](https?[^'"]+)['"]""")
+                    .find(unpacked)?.groupValues?.get(1)
+                if (file != null) {
+                    val type = when {
+                        file.contains(".m3u8", true) -> ExtractorLinkType.M3U8
+                        file.contains(".mp4", true) -> ExtractorLinkType.VIDEO
+                        else -> ExtractorLinkType.VIDEO
+                    }
+                    callback(newExtractorLink(name, label, file, type) {
+                        referer = link
+                        quality = Qualities.Unknown.value
+                    })
+                    found = true
+                }
             } catch (_: Exception) {
-                break
             }
-            pages += nextDoc
-            current = nextDoc
-            if (!hasNext(current, page)) break
         }
-        return pages
+        return found
     }
 
-    private fun titleOf(a: Element): String = listOf(
-        a.attr("title"),
-        a.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
-        a.selectFirst("img")?.attr("alt").orEmpty(),
-        a.text(),
-        a.parent()?.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
-    ).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-
-    private fun baseSeriesTitle(title: String): String {
-        val withoutPrefix = title.trim().replace(
-            Regex("^(?:مسلسل|انمي|أنمي|برنامج)\\s*", RegexOption.IGNORE_CASE),
-            ""
-        )
-        val withoutEpisode = withoutPrefix.replace(
-            Regex("\\s*(?:الحلقة|حلقة|episode|ep\\.?|الموسم|season)\\s*.*$", RegexOption.IGNORE_CASE),
-            ""
-        )
-        return withoutEpisode.replace(
-            Regex("\\s+(?:HD|FHD|FULL\\s*HD|مترجم|مدبلج|كامل)+$", RegexOption.IGNORE_CASE),
-            ""
-        ).trim(' ', '-', ':', '|')
-    }
-
-    private fun normalizeTitle(value: String): String =
-        value.lowercase().replace(Regex("[\\s\\p{Punct}ـ]+"), "")
-
-    private fun seasonNumber(value: String): Int? {
-        val normalized = digits(value)
-        Regex("(?:الموسم|season|\\bS\\s*)[^0-9]{0,8}(\\d+)", RegexOption.IGNORE_CASE)
-            .find(normalized)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
-
-        val lower = value.lowercase()
-        val ordinals = listOf(
-            listOf("الأول", "الاول", "الأولى", "الاولى", "first", "one") to 1,
-            listOf("الثاني", "الثانية", "second", "two") to 2,
-            listOf("الثالث", "الثالثة", "third", "three") to 3,
-            listOf("الرابع", "الرابعة", "fourth", "four") to 4,
-            listOf("الخامس", "الخامسة", "fifth", "five") to 5,
-            listOf("السادس", "السادسة", "sixth", "six") to 6,
-            listOf("السابع", "السابعة", "seventh", "seven") to 7,
-            listOf("الثامن", "الثامنة", "eighth", "eight") to 8,
-            listOf("التاسع", "التاسعة", "ninth", "nine") to 9,
-            listOf("العاشر", "العاشرة", "tenth", "ten") to 10,
-        )
-        return ordinals.firstOrNull { (words, _) ->
-            words.any { lower.contains(it) }
-        }?.second
-    }
-
-    private fun episodeNumber(value: String): Int? {
-        val normalized = digits(value)
-        val patterns = listOf(
-            Regex("(?:الحلقة|حلقة|episode|ep\\.?)[^0-9]{0,8}(\\d+)", RegexOption.IGNORE_CASE),
-            Regex("(\\d+)\\s*(?:الحلقة|حلقة|episode|ep\\.?)", RegexOption.IGNORE_CASE),
-        )
-        patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1)?.toIntOrNull() }?.let { return it }
-
-        val lower = normalized.lowercase()
-        val ordinals = listOf(
-            listOf("الأولى", "الاولى", "الأول", "الاول", "first", "one") to 1,
-            listOf("الثانية", "الثاني", "second", "two") to 2,
-            listOf("الثالثة", "الثالث", "third", "three") to 3,
-            listOf("الرابعة", "الرابع", "fourth", "four") to 4,
-            listOf("الخامسة", "الخامس", "fifth", "five") to 5,
-            listOf("السادسة", "السادس", "sixth", "six") to 6,
-            listOf("السابعة", "السابع", "seventh", "seven") to 7,
-            listOf("الثامنة", "الثامن", "eighth", "eight") to 8,
-            listOf("التاسعة", "التاسع", "ninth", "nine") to 9,
-            listOf("العاشرة", "العاشر", "tenth", "ten") to 10,
-        )
-        return ordinals.firstNotNullOfOrNull { (words, number) ->
-            if (words.any { lower.contains(it) }) number else null
-        }
-    }
-
-    private fun seriesTitleFromPage(doc: Document, fallback: String): String {
-        val heading = doc.select("h2,h3,.series-title,.serie-title")
-            .map { it.text().trim() }
-            .firstOrNull {
-                it.isNotBlank() &&
-                    !it.contains("الحلقة", ignoreCase = true) &&
-                    !it.contains("المواسم", ignoreCase = true)
-            }
-        return baseSeriesTitle(heading ?: fallback).ifBlank { baseSeriesTitle(fallback) }
-    }
-
-    private fun hasEpisodeSection(doc: Document): Boolean =
-        doc.text().contains("المواسم والحلقات") && doc.select("a[href*='watch.php']").isNotEmpty()
-
-    private fun isSeriesTitle(title: String): Boolean =
-        typeOf(title, null) in setOf(TvType.TvSeries, TvType.Anime, TvType.Cartoon)
-
-    private fun posterOf(a: Element): String? {
-        val img = a.selectFirst("img") ?: a.parent()?.selectFirst("img") ?: return null
-        return listOf("data-src", "data-original", "data-lazy-src", "src")
-            .firstNotNullOfOrNull { img.absUrl(it).takeIf { u -> http(u) } }
-    }
-
-    private fun typeOf(title: String, fallback: TvType? = null): TvType? = when {
-        title.contains("فيلم") || title.contains("أفلام") || title.contains("افلام") ||
-            title.contains("مسرحية") -> TvType.Movie
-        title.contains("أنمي") || title.contains("انمي") || title.contains("anime", true) -> TvType.Anime
-        title.contains("كرتون") || title.contains("cartoon", true) -> TvType.Cartoon
-        title.contains("مسلسل") || title.contains("برنامج") ||
-            title.contains("الحلقة") || title.contains("episode", true) -> TvType.TvSeries
-        else -> fallback
-    }
-
-    private fun categoryType(url: String, label: String = ""): TvType? {
-        val slug = url.substringAfter("cat=", "").substringBefore('&').lowercase()
-        return when {
-            slug.startsWith("aflam") || slug.contains("movie") || slug.contains("film") -> TvType.Movie
-            slug.contains("anime") -> TvType.Anime
-            slug.contains("cartoon") -> TvType.Cartoon
-            slug.contains("msr7") -> TvType.Movie
-            slug.contains("tv-show") || slug.contains("series") || slug.contains("moslslat") -> TvType.TvSeries
-            else -> typeOf(label, null)
-        }
-    }
-
-    private fun digits(s: String) = buildString {
-        s.forEach { c -> append(when (c) {
-            in '٠'..'٩' -> '0' + (c - '٠')
-            in '۰'..'۹' -> '0' + (c - '۰')
-            else -> c
-        }) }
-    }
-
-    private fun hasNext(doc: Document, page: Int): Boolean = nextUrl(doc) != null ||
-        doc.select("a[href]").any { (Regex("[?&]page=(\\d+)").find(it.absUrl("href"))?.groupValues?.get(1)?.toIntOrNull() ?: 0) > page }
-
-    private fun pageUrl(doc: Document, page: Int): String? = doc.select(
-        ".pagination a[href], .pages a[href], .page-numbers a[href], a[href*='page=']"
-    ).firstNotNullOfOrNull { a ->
-        val u = a.absUrl("href")
-        if (Regex("[?&]page=(\\d+)").find(u)?.groupValues?.get(1)?.toIntOrNull() == page && siteUrl(u)) u else null
-    }
-
-    private fun nextUrl(doc: Document): String? {
-        val labels = setOf("»", "›", ">", "التالي", "next", "next page")
-        return doc.select("a[rel=next][href], .pagination a[href], .pages a[href], .page-numbers a[href]")
-            .firstNotNullOfOrNull { a ->
-                val label = a.text().trim().lowercase()
-                val title = a.attr("title").trim().lowercase()
-                val url = a.absUrl("href")
-                if ((label in labels || title in labels || a.attr("aria-label").lowercase() in labels) && siteUrl(url)) url else null
-            }
-    }
-
-    private fun queryUrl(url: String, values: Map<String, String>): String = url +
-        (if (url.contains('?')) "&" else "?") + values.entries.joinToString("&") {
-            "${URLEncoder.encode(it.key, "UTF-8") }=${URLEncoder.encode(it.value, "UTF-8")}"
-        }
-
-    private fun isCategoryIndex(url: String) = url.substringBefore('?').substringAfterLast('/') == "category.php" &&
-        !url.substringAfter('?', "").contains("cat=")
-    private fun siteUrl(url: String) = url.startsWith("$mainUrl/") || url == mainUrl
-    private fun http(url: String) = url.startsWith("https://", true) || url.startsWith("http://", true)
-    private fun absolute(el: Element, key: String): String {
-        val u = el.absUrl(key)
-        if (u.isNotBlank()) return u
-        val raw = el.attr(key).trim()
-        return when {
-            raw.startsWith("//") -> "https:$raw"
-            raw.startsWith("/") -> mainUrl + raw
-            else -> raw
-        }
-    }
-
-    private fun streamType(url: String): ExtractorLinkType? = when (url.substringBefore('?').substringBefore('#').lowercase().substringAfterLast('.')) {
-        "m3u8" -> ExtractorLinkType.M3U8
-        "mpd" -> ExtractorLinkType.DASH
-        "mp4", "webm" -> ExtractorLinkType.VIDEO
-        else -> null
-    }
 }
