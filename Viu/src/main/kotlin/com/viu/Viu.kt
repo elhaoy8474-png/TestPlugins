@@ -232,7 +232,10 @@ class Viu : MainAPI() {
                 if (seriesImage == null) seriesImage = poster(item)
                 if (seriesDescription.isBlank()) seriesDescription = firstText(item, "description")
                 val episodeTitle = synopsis.ifBlank { "الحلقة ${number ?: i + 1}" }
-                episodes.add(newEpisode("viu://product/$episodeId") {
+                val ccsId = firstText(item, "ccs_product_id")
+                if (ccsId.isBlank()) continue
+                val episodeData = JSONObject().put("ccs", ccsId).put("pid", episodeId).toString()
+                episodes.add(newEpisode(episodeData) {
                     name = episodeTitle
                     episode = number ?: (i + 1)
                     season = 1
@@ -275,22 +278,55 @@ class Viu : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         loadSiteSettings()
-        val id = productId(data) ?: return false
-        val currentData = productData(id) ?: return false
-        val product = currentData.optJSONObject("current_product") ?: return false
-        val ccsId = product.optString("ccs_product_id")
-        if (ccsId.isBlank()) return false
+
+        // Episodes carry both identifiers returned by /vod/product-list.
+        // Movies keep the legacy product URL and are handled by the fallback.
+        val episodeInfo = try { JSONObject(data) } catch (_: Exception) { null }
+        val ccsId = episodeInfo?.optString("ccs").orEmpty()
+        val episodeProductId = episodeInfo?.optString("pid").orEmpty()
+        if (ccsId.isBlank() || episodeProductId.isBlank()) {
+            val id = productId(data) ?: return false
+            val currentData = productData(id) ?: return false
+            val product = currentData.optJSONObject("current_product") ?: return false
+            val movieCcsId = product.optString("ccs_product_id")
+            if (movieCcsId.isBlank()) return false
+            return loadViuPlayback(movieCcsId, id, subtitleCallback, callback)
+        }
+        return loadViuPlayback(ccsId, episodeProductId, subtitleCallback, callback)
+    }
+
+    private suspend fun loadViuPlayback(
+        ccsId: String,
+        productId: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
         val auth = token() ?: return false
-        val playbackUrl = "$api/api/playback/distribute?platform_flag_label=web&area_id=$areaId&language_flag_id=$languageFlagId&countryCode=${region.uppercase()}&ccs_product_id=$ccsId"
-        val headers = webHeaders + mapOf("Authorization" to auth, "Accept" to "application/json")
+        val headers = webHeaders + mapOf(
+            "Authorization" to auth,
+            "Accept" to "application/json",
+            "User-Agent" to "okhttp/4.12.0"
+        )
+
+        // Fetch episode detail using the mobile API, as required by Viu's player flow.
+        val detailUrl = "$api/api/mobile?platform_flag_label=phone&os_flag_id=2&r=%2Fvod%2Fdetail&product_id=$productId&language_flag_id=$languageFlagId&area_id=$areaId&countryCode=${region.uppercase()}"
+        val detail = try { json(app.get(detailUrl, headers = headers).text) } catch (_: Exception) { null }
+        val product = detail?.optJSONObject("data")?.optJSONObject("current_product")
+        val subtitles = product?.optJSONArray("subtitle") ?: JSONArray()
+        for (i in 0 until subtitles.length()) {
+            val sub = subtitles.optJSONObject(i) ?: continue
+            val subUrl = firstText(sub, "url", "subtitle_url")
+            if (subUrl.startsWith("http")) {
+                subtitleCallback(SubtitleFile(firstText(sub, "iso_code", "code", "name").ifBlank { "Viu" }, subUrl))
+            }
+        }
+
+        val playbackUrl = "$api/api/playback/distribute?ccs_product_id=$ccsId&platform_flag_label=phone&language_flag_id=$languageFlagId&area_id=$areaId"
         val playback = try { json(app.get(playbackUrl, headers = headers).text) } catch (_: Exception) { null } ?: return false
-        val status = playback.optJSONObject("status")
-        if (status != null && status.optInt("code", 0) > 0) return false
         val stream = playback.optJSONObject("data")?.optJSONObject("stream") ?: return false
         val streamUrls = linkedSetOf<String>()
-        for (key in listOf("url4", "url3", "url2", "url", "airplayurl")) {
-            val value = stream.opt(key)
-            when (value) {
+        for (key in listOf("url", "url2", "url3", "url4", "airplayurl")) {
+            when (val value = stream.opt(key)) {
                 is JSONObject -> {
                     val keys = value.keys()
                     while (keys.hasNext()) {
@@ -301,27 +337,20 @@ class Viu : MainAPI() {
                 is String -> if (value.startsWith("http")) streamUrls.add(value)
             }
         }
+
         var found = false
         for (streamUrl in streamUrls) {
             try {
                 if (streamUrl.contains(".m3u8", true)) {
-                    M3u8Helper.generateM3u8("Viu", streamUrl, mainUrl, headers = webHeaders).forEach(callback)
+                    M3u8Helper.generateM3u8("Viu", streamUrl, mainUrl, headers = headers).forEach(callback)
                 } else {
                     callback(newExtractorLink("Viu", "Viu", streamUrl, ExtractorLinkType.VIDEO) {
-                        referer = mainUrl
+                        referer = "$mainUrl/"
                         quality = Qualities.Unknown.value
                     })
                 }
                 found = true
             } catch (_: Exception) { }
-        }
-        val subtitles = product.optJSONArray("subtitle") ?: JSONArray()
-        for (i in 0 until subtitles.length()) {
-            val sub = subtitles.optJSONObject(i) ?: continue
-            val subUrl = sub.optString("subtitle_url")
-            if (subUrl.startsWith("http")) {
-                subtitleCallback(SubtitleFile(sub.optString("code").ifBlank { "Viu" }, subUrl))
-            }
         }
         return found
     }
