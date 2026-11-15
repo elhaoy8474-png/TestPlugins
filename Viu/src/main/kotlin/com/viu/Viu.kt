@@ -33,6 +33,22 @@ class Viu : MainAPI() {
 
     private fun json(text: String): JSONObject? = try { JSONObject(text) } catch (_: Exception) { null }
 
+    // Diagnostic-only: record public entitlement/error metadata, never tokens or stream URLs.
+    private fun logPlaybackDiagnostic(stage: String, root: JSONObject?, product: JSONObject? = null) {
+        val rootCode = firstText(root, "code", "status", "error_code").ifBlank { "none" }
+        val data = root?.optJSONObject("data")
+        val dataKeys = data?.keys()?.asSequence()?.toList()?.sorted()?.joinToString(",") ?: "none"
+        val entitlementKeys = listOf(
+            "is_vip", "is_premium", "is_free", "is_subscribe", "is_locked",
+            "is_lock", "is_pay", "vip", "pay_type", "purchase_type",
+            "product_type", "subscription_status", "entitlement"
+        )
+        val flags = entitlementKeys.mapNotNull { key ->
+            if (product?.has(key) == true) "$key=${product.opt(key)}" else null
+        }.joinToString(",").ifBlank { "not_returned" }
+        println("[VIU-DIAG] stage=$stage code=$rootCode data_keys=$dataKeys entitlement=$flags")
+    }
+
     private fun firstText(item: JSONObject?, vararg keys: String): String {
         if (item == null) return ""
         for (key in keys) {
@@ -333,6 +349,7 @@ class Viu : MainAPI() {
         val detailUrl = "$api/api/mobile?platform_flag_label=phone&os_flag_id=2&r=%2Fvod%2Fdetail&product_id=$productId&language_flag_id=$languageFlagId&area_id=$areaId&countryCode=${region.uppercase()}"
         val detail = try { json(app.get(detailUrl, headers = headers).text) } catch (_: Exception) { null }
         val product = detail?.optJSONObject("data")?.optJSONObject("current_product")
+        logPlaybackDiagnostic("detail", detail, product)
         val subtitles = product?.optJSONArray("subtitle") ?: JSONArray()
         for (i in 0 until subtitles.length()) {
             val sub = subtitles.optJSONObject(i) ?: continue
@@ -343,8 +360,17 @@ class Viu : MainAPI() {
         }
 
         val playbackUrl = "$api/api/playback/distribute?ccs_product_id=$ccsId&platform_flag_label=phone&language_flag_id=$languageFlagId&area_id=$areaId"
-        val playback = try { json(app.get(playbackUrl, headers = headers).text) } catch (_: Exception) { null } ?: return false
-        val stream = playback.optJSONObject("data")?.optJSONObject("stream") ?: return false
+        val playback = try { json(app.get(playbackUrl, headers = headers).text) } catch (_: Exception) { null }
+        if (playback == null) {
+            logPlaybackDiagnostic("playback", null)
+            return false
+        }
+        val stream = playback.optJSONObject("data")?.optJSONObject("stream")
+        if (stream == null) {
+            logPlaybackDiagnostic("playback_no_stream", playback)
+            return false
+        }
+        logPlaybackDiagnostic("playback_stream_present", playback)
         val streamUrls = linkedSetOf<String>()
         for (key in listOf("url", "url2", "url3", "url4", "airplayurl")) {
             when (val value = stream.opt(key)) {
