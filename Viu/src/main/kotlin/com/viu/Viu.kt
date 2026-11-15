@@ -108,7 +108,7 @@ class Viu : MainAPI() {
         loadSiteSettings()
         val items = mutableListOf<SearchResponse>()
         try {
-            val url = "$api/api/mobile?r=%2Fhome%2Fajax-index&area_id=$areaId&language_flag_id=$languageFlagId"
+            val url = "$mainUrl/ott/$region/index.php?r=home/ajax-index&area_id=$areaId&language_flag_id=$languageFlagId"
             val root = json(app.get(url, headers = webHeaders).text)
             val grids = root?.optJSONObject("data")?.optJSONArray("grid") ?: JSONArray()
             for (i in 0 until grids.length()) {
