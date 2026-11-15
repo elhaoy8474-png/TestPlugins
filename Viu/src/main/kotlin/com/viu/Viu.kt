@@ -38,13 +38,23 @@ class Viu : MainAPI() {
     private fun poster(item: JSONObject): String? =
         item.optString("series_image_url").takeIf { it.startsWith("http") }
             ?: item.optString("cover_image_url").takeIf { it.startsWith("http") }
+            ?: item.optString("product_cover_image_url").takeIf { it.startsWith("http") }
             ?: item.optString("product_image_url").takeIf { it.startsWith("http") }
+            ?: item.optString("image_url").takeIf { it.startsWith("http") }
 
     private fun itemResponse(item: JSONObject, fallbackName: String = ""): SearchResponse? {
-        val id = item.optString("product_id").ifBlank { item.optString("id") }
+        val id = item.optString("product_id").ifBlank {
+            item.optString("id").ifBlank { item.optString("series_id") }
+        }
         if (id.isBlank() || id == "0") return null
-        val title = item.optString("name").ifBlank {
-            item.optString("series_name").ifBlank { fallbackName }
+        // Viu home grids use "title" and "series_name"; they do not use "name".
+        // Prefer the series title for episodic products and the product title as fallback.
+        val title = item.optString("series_name").ifBlank {
+            item.optString("name").ifBlank {
+                item.optString("title").ifBlank {
+                    item.optString("synopsis").ifBlank { item.optString("product_synopsis").ifBlank { fallbackName } }
+                }
+            }
         }.trim()
         if (title.isBlank()) return null
         val image = poster(item)
@@ -107,35 +117,28 @@ class Viu : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         loadSiteSettings()
         val items = mutableListOf<SearchResponse>()
-        try {
-            val url = "$mainUrl/ott/$region/index.php?r=home/ajax-index&area_id=$areaId&language_flag_id=$languageFlagId"
-            val root = json(app.get(url, headers = webHeaders).text)
-            val grids = root?.optJSONObject("data")?.optJSONArray("grid") ?: JSONArray()
-            for (i in 0 until grids.length()) {
-                val grid = grids.optJSONObject(i) ?: continue
-                val products = grid.optJSONArray("product") ?: continue
-                for (j in 0 until products.length()) {
-                    val item = products.optJSONObject(j) ?: continue
-                    itemResponse(item, grid.optString("name"))?.let(items::add)
-                }
+        // The live Viu web/mobile gateway exposes the home catalogue at /home/index.
+        // The former /ott/eg/index.php?r=home/ajax-index URL is not the catalogue API.
+        val url = "$api/api/mobile?r=/home/index&platform_flag_label=web&language_flag_id=$languageFlagId&ut=0&area_id=$areaId"
+        val root = try {
+            json(app.get(url, headers = webHeaders).text)
+        } catch (_: Exception) {
+            null
+        }
+        val data = root?.optJSONObject("data")
+        val banners = data?.optJSONArray("banner") ?: JSONArray()
+        for (i in 0 until banners.length()) {
+            val item = banners.optJSONObject(i) ?: continue
+            itemResponse(item)?.let(items::add)
+        }
+        val grids = data?.optJSONArray("grid") ?: JSONArray()
+        for (i in 0 until grids.length()) {
+            val grid = grids.optJSONObject(i) ?: continue
+            val products = grid.optJSONArray("product") ?: continue
+            for (j in 0 until products.length()) {
+                val item = products.optJSONObject(j) ?: continue
+                itemResponse(item, grid.optString("name"))?.let(items::add)
             }
-        } catch (_: Exception) { }
-        if (items.isEmpty()) {
-            try {
-                val html = app.get(request.data, headers = webHeaders).text
-                val ids = Regex("""/vod/([0-9]+)""").findAll(html).map { it.groupValues[1] }.distinct().take(30)
-                for (id in ids) {
-                    val data = productData(id) ?: continue
-                    val current = data.optJSONObject("current_product") ?: continue
-                    val series = data.optJSONObject("series") ?: JSONObject()
-                    itemResponse(JSONObject().apply {
-                        put("product_id", series.optString("series_id").ifBlank { id })
-                        put("name", series.optString("name").ifBlank { current.optString("synopsis") })
-                        put("is_movie", current.optInt("is_movie", 0))
-                        put("series_image_url", current.optString("cover_image_url"))
-                    })?.let(items::add)
-                }
-            } catch (_: Exception) { }
         }
         return newHomePageResponse(request.name, items.distinctBy { it.url })
     }
