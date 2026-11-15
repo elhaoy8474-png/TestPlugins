@@ -35,7 +35,7 @@ class AhwakTV : MainAPI() {
                 doc = app.get(next, headers = headers, referer = doc.location()).document
             }
         }
-        val items = if (isCategoryIndex(request.data)) categories(doc) else media(doc)
+        val items = if (isCategoryIndex(request.data)) categories(doc) else media(doc, categoryType(request.data))
         return newHomePageResponse(request, items, !isCategoryIndex(request.data) && hasNext(doc, page))
     }
 
@@ -71,22 +71,55 @@ class AhwakTV : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url, headers = headers, referer = mainUrl).document
-        val title = doc.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
-            ?.takeIf { it.isNotBlank() } ?: doc.selectFirst("h1")?.text()?.trim()
-            ?.takeIf { it.isNotBlank() } ?: url.substringBefore('?').substringAfterLast('/').substringBefore('.').ifBlank { "AhwakTV" }
+        val title = doc.selectFirst("h1")?.text()?.trim()?.takeIf { it.isNotBlank() }
+            ?: doc.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
+                ?.takeIf { it.isNotBlank() }
+            ?: doc.title().substringBefore(" - ").trim().ifBlank { "AhwakTV" }
         val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")?.trim()
             ?.takeIf { it.isNotBlank() }
             ?.let { image -> if (image.startsWith("http")) image else mainUrl + "/" + image.trimStart('/') }
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")?.trim()
         val path = url.substringBefore('?').substringAfterLast('/')
-        val episodes = episodes(doc, poster)
-        val category = path == "category.php" && url.substringAfter('?', "").contains("cat=")
-        if (path == "view-serie.php" || category) {
-            return newTvSeriesLoadResponse(title, url, if (category) TvType.TvSeries else typeOf(title), episodes) {
+        val isCategory = path == "category.php" && url.substringAfter('?', "").contains("cat=")
+
+        if (isCategory) {
+            val kind = categoryType(url, title) ?: TvType.TvSeries
+            val results = media(doc, kind)
+            return if (kind == TvType.Movie) {
+                newMovieLoadResponse(title, url, TvType.Movie, "") {
+                    posterUrl = poster
+                    this.plot = plot
+                    recommendations = results
+                }
+            } else {
+                newTvSeriesLoadResponse(title, url, kind, emptyList()) {
+                    posterUrl = poster
+                    this.plot = plot
+                    recommendations = results
+                }
+            }
+        }
+
+        if (path == "view-serie.php") {
+            val kind = typeOf(title, TvType.TvSeries) ?: TvType.TvSeries
+            val episodeList = episodes(doc, poster, title)
+            return newTvSeriesLoadResponse(title, url, kind, episodeList) {
                 posterUrl = poster
                 this.plot = plot
             }
         }
+
+        if (path == "watch.php" && (hasEpisodeSection(doc) || isSeriesTitle(title))) {
+            val seriesName = seriesTitleFromPage(doc, title)
+            val kind = typeOf(seriesName, typeOf(title, TvType.TvSeries) ?: TvType.TvSeries)
+                ?: TvType.TvSeries
+            val episodeList = episodes(doc, poster, seriesName, url)
+            return newTvSeriesLoadResponse(seriesName, url, kind, episodeList) {
+                posterUrl = poster
+                this.plot = plot
+            }
+        }
+
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             posterUrl = poster
             this.plot = plot
@@ -99,7 +132,8 @@ class AhwakTV : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
-        if (!data.startsWith("http://") && !data.startsWith("https://")) return false
+        if (!http(data)) return false
+
         val doc = app.get(data, headers = headers, referer = mainUrl).document
         val candidates = linkedMapOf<String, String>()
         doc.select("iframe[src], iframe[data-src], video[src], video[data-src], video source[src], source[src]")
@@ -113,21 +147,25 @@ class AhwakTV : MainAPI() {
                 if (http(src)) candidates.putIfAbsent(src, el.text().trim().ifBlank { "Server ${i + 1}" })
             }
 
-        var found = false
+        var emitted = 0
+        val emit: (ExtractorLink) -> Unit = { link ->
+            emitted += 1
+            callback(link)
+        }
+
         for ((src, label) in candidates) {
             val type = streamType(src)
             if (type != null) {
-                callback(newExtractorLink("AhwakTV", label, src, type) {
+                emit(newExtractorLink("AhwakTV", label, src, type) {
                     referer = data
                     quality = Qualities.Unknown.value
                     this.headers = this@AhwakTV.headers
                 })
-                found = true
             } else {
-                found = loadExtractor(src, data, subtitleCallback, callback) || found
+                loadExtractor(src, data, subtitleCallback, emit)
             }
         }
-        return found
+        return emitted > 0
     }
 
     private fun searchInput(form: Element): Element? = form.select("input").firstOrNull {
@@ -143,62 +181,176 @@ class AhwakTV : MainAPI() {
         val seen = hashSetOf<String>()
         return doc.select("a[href]").mapNotNull { a ->
             val url = a.absUrl("href")
-            if (!siteUrl(url) || !url.contains("category.php") || !url.substringAfter('?', "").contains("cat=")) return@mapNotNull null
+            if (!siteUrl(url) || !url.contains("category.php") ||
+                !url.substringAfter('?', "").contains("cat=")) return@mapNotNull null
             val title = titleOf(a)
             if (title.length < 2 || !seen.add(url)) return@mapNotNull null
-            newTvSeriesSearchResponse(title, url, TvType.TvSeries) { posterUrl = posterOf(a) }
-        }
-    }
-
-    private fun media(doc: Document): List<SearchResponse> {
-        val seen = hashSetOf<String>()
-        return doc.select("a[href]").mapNotNull { a ->
-            val url = a.absUrl("href")
-            if (!siteUrl(url)) return@mapNotNull null
-            val path = url.substringBefore('?').substringAfterLast('/').lowercase()
-            if (path !in setOf("view-serie.php", "watch.php")) return@mapNotNull null
-            val title = titleOf(a)
-            if (title.length < 2 || !seen.add(url)) return@mapNotNull null
-            when (path) {
-                "view-serie.php" -> newTvSeriesSearchResponse(title, url, typeOf(title)) { posterUrl = posterOf(a) }
-                "watch.php" -> newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = posterOf(a) }
-                else -> null
+            val kind = categoryType(url, title) ?: TvType.TvSeries
+            if (kind == TvType.Movie) {
+                newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = posterOf(a) }
+            } else {
+                newTvSeriesSearchResponse(title, url, kind) { posterUrl = posterOf(a) }
             }
         }
     }
 
-    private fun episodes(doc: Document, poster: String?): List<Episode> {
-        val seen = hashSetOf<String>()
-        val counts = hashMapOf<Int, Int>()
-        return doc.select("a[href*='watch.php']").mapNotNull { a ->
+    private fun media(doc: Document, fallbackType: TvType? = null): List<SearchResponse> {
+        val seenUrls = hashSetOf<String>()
+        val seenSeries = hashSetOf<String>()
+        val results = mutableListOf<SearchResponse>()
+
+        for (a in doc.select("a[href]")) {
             val url = a.absUrl("href")
-            if (!siteUrl(url)) return@mapNotNull null
-            val label = titleOf(a)
-            if (label.isBlank() || !seen.add(url)) return@mapNotNull null
-            val context = a.parents().take(4).joinToString(" ") {
-                it.id() + " " + it.classNames().joinToString(" ") + " " + it.attr("data-season") + " " +
+            if (!siteUrl(url)) continue
+            val path = url.substringBefore('?').substringAfterLast('/').lowercase()
+            if (path !in setOf("view-serie.php", "watch.php")) continue
+
+            val title = titleOf(a)
+            if (title.length < 2) continue
+
+            if (path == "view-serie.php") {
+                if (!seenUrls.add(url)) continue
+                val kind = typeOf(title, fallbackType ?: TvType.TvSeries) ?: TvType.TvSeries
+                results += newTvSeriesSearchResponse(title, url, kind) {
+                    posterUrl = posterOf(a)
+                }
+                continue
+            }
+
+            val kind = typeOf(title, fallbackType) ?: TvType.Movie
+            if (kind == TvType.Movie) {
+                if (!seenUrls.add(url)) continue
+                results += newMovieSearchResponse(title, url, TvType.Movie) {
+                    posterUrl = posterOf(a)
+                }
+            } else {
+                val seriesName = baseSeriesTitle(title).ifBlank { title }
+                val key = normalizeTitle(seriesName)
+                if (key.isBlank() || !seenSeries.add(key)) continue
+                results += newTvSeriesSearchResponse(seriesName, url, kind) {
+                    posterUrl = posterOf(a)
+                }
+            }
+        }
+
+        return results
+    }
+
+    private fun episodes(
+        doc: Document,
+        poster: String?,
+        seriesName: String?,
+        currentUrl: String? = null,
+    ): List<Episode> {
+        val result = linkedMapOf<String, Episode>()
+        val counts = hashMapOf<Int, Int>()
+        val seriesKey = normalizeTitle(seriesName.orEmpty())
+
+        for (a in doc.select("a[href*='watch.php']")) {
+            val url = a.absUrl("href")
+            if (!siteUrl(url)) continue
+
+            val label = titleOf(a).ifBlank { a.text().trim() }
+            val numberFromLabel = episodeNumber(label)
+            val episodeOnly = label.matches(Regex("""^\\s*[0-9٠-٩۰-۹]+\\s*(?:حلقة|الحلقة)?\\s*$"""))
+            val inEpisodeSection = a.parents().take(5).any { parent ->
+                parent.text().contains("المواسم والحلقات", ignoreCase = true) ||
+                    parent.classNames().any { it.contains("episode", true) || it.contains("season", true) }
+            }
+            val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
+
+            if (seriesName != null && !sameSeries && !(episodeOnly && inEpisodeSection) && !inEpisodeSection) {
+                continue
+            }
+            if (label.isBlank() && !episodeOnly) continue
+
+            val context = a.parents().take(6).joinToString(" ") {
+                it.id() + " " + it.classNames().joinToString(" ") + " " +
+                    it.attr("data-season") + " " +
                     (it.selectFirst("h2,h3,h4")?.text() ?: "")
             }
-            val season = Regex("(?:الموسم|season|s)[^0-9]{0,6}(\\d+)", RegexOption.IGNORE_CASE)
+            val season = Regex("(?:الموسم|season|\\\\bS\\\\s*)[^0-9]{0,6}(\\\\d+)", RegexOption.IGNORE_CASE)
                 .find(digits(context))?.groupValues?.get(1)?.toIntOrNull() ?: 1
-            val index = (counts[season] ?: 0) + 1
-            val number = Regex("(?:الحلقة|حلقة|episode|ep\\.?)[^0-9]{0,8}(\\d+)", RegexOption.IGNORE_CASE)
-                .find(digits(label))?.groupValues?.get(1)?.toIntOrNull() ?: index
-            counts[season] = maxOf(index, number)
-            newEpisode(url = url, initializer = {
-                name = label.ifBlank { "الحلقة $number" }
+            val nextIndex = (counts[season] ?: 0) + 1
+            val number = numberFromLabel ?: nextIndex
+            counts[season] = maxOf(nextIndex, number)
+            val displayName = if (episodeOnly) "الحلقة $number" else label
+
+            result.putIfAbsent(url, newEpisode(url) {
+                name = displayName
                 episode = number
                 this.season = season
                 posterUrl = poster
             })
-        }.sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
+        }
+
+        if (currentUrl != null && siteUrl(currentUrl) && !result.containsKey(currentUrl)) {
+            val currentTitle = doc.selectFirst("h1")?.text()?.trim().orEmpty()
+            val number = episodeNumber(currentTitle) ?: 1
+            result[currentUrl] = newEpisode(currentUrl) {
+                name = currentTitle.ifBlank { "الحلقة $number" }
+                episode = number
+                season = 1
+                posterUrl = poster
+            }
+        }
+
+        return result.values.sortedWith(
+            compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE }
+        )
     }
 
     private fun titleOf(a: Element): String = listOf(
-        a.attr("title"), a.text(), a.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
+        a.attr("title"),
+        a.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
         a.selectFirst("img")?.attr("alt").orEmpty(),
         a.parent()?.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
+        a.text(),
     ).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+
+    private fun baseSeriesTitle(title: String): String {
+        val withoutPrefix = title.trim().replace(
+            Regex("^(?:مسلسل|انمي|أنمي|برنامج)\\\\s*", RegexOption.IGNORE_CASE),
+            ""
+        )
+        val withoutEpisode = withoutPrefix.replace(
+            Regex("\\\\s*(?:الحلقة|حلقة|episode|ep\\\\.?|الموسم|season)\\\\s*.*$", RegexOption.IGNORE_CASE),
+            ""
+        )
+        return withoutEpisode.replace(
+            Regex("\\\\s+(?:HD|FHD|FULL\\\\s*HD|مترجم|مدبلج|كامل)+$", RegexOption.IGNORE_CASE),
+            ""
+        ).trim(' ', '-', ':', '|')
+    }
+
+    private fun normalizeTitle(value: String): String =
+        value.lowercase().replace(Regex("[\\\\s\\\\p{Punct}ـ]+"), "")
+
+    private fun episodeNumber(value: String): Int? {
+        val normalized = digits(value)
+        val patterns = listOf(
+            Regex("(?:الحلقة|حلقة|episode|ep\\\\.?)[^0-9]{0,8}(\\\\d+)", RegexOption.IGNORE_CASE),
+            Regex("(\\\\d+)\\\\s*(?:الحلقة|حلقة|episode|ep\\\\.?)", RegexOption.IGNORE_CASE),
+        )
+        return patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1)?.toIntOrNull() }
+    }
+
+    private fun seriesTitleFromPage(doc: Document, fallback: String): String {
+        val heading = doc.select("h2,h3,.series-title,.serie-title")
+            .map { it.text().trim() }
+            .firstOrNull {
+                it.isNotBlank() &&
+                    !it.contains("الحلقة", ignoreCase = true) &&
+                    !it.contains("المواسم", ignoreCase = true)
+            }
+        return baseSeriesTitle(heading ?: fallback).ifBlank { baseSeriesTitle(fallback) }
+    }
+
+    private fun hasEpisodeSection(doc: Document): Boolean =
+        doc.text().contains("المواسم والحلقات") && doc.select("a[href*='watch.php']").isNotEmpty()
+
+    private fun isSeriesTitle(title: String): Boolean =
+        typeOf(title, null) in setOf(TvType.TvSeries, TvType.Anime, TvType.Cartoon)
 
     private fun posterOf(a: Element): String? {
         val img = a.selectFirst("img") ?: a.parent()?.selectFirst("img") ?: return null
@@ -206,11 +358,25 @@ class AhwakTV : MainAPI() {
             .firstNotNullOfOrNull { img.absUrl(it).takeIf { u -> http(u) } }
     }
 
-    private fun typeOf(title: String): TvType = when {
+    private fun typeOf(title: String, fallback: TvType? = null): TvType? = when {
+        title.contains("فيلم") || title.contains("أفلام") || title.contains("افلام") -> TvType.Movie
         title.contains("أنمي") || title.contains("انمي") || title.contains("anime", true) -> TvType.Anime
         title.contains("كرتون") || title.contains("cartoon", true) -> TvType.Cartoon
-        title.contains("فيلم") || title.contains("أفلام") || title.contains("افلام") -> TvType.Movie
-        else -> TvType.TvSeries
+        title.contains("مسلسل") || title.contains("برنامج") ||
+            title.contains("الحلقة") || title.contains("episode", true) -> TvType.TvSeries
+        else -> fallback
+    }
+
+    private fun categoryType(url: String, label: String = ""): TvType? {
+        val slug = url.substringAfter("cat=", "").substringBefore('&').lowercase()
+        return when {
+            slug.startsWith("aflam") || slug.contains("movie") || slug.contains("film") -> TvType.Movie
+            slug.contains("anime") -> TvType.Anime
+            slug.contains("cartoon") -> TvType.Cartoon
+            slug.contains("msr7") -> TvType.Movie
+            slug.contains("tv-show") || slug.contains("series") || slug.contains("moslslat") -> TvType.TvSeries
+            else -> typeOf(label, null)
+        }
     }
 
     private fun digits(s: String) = buildString {
