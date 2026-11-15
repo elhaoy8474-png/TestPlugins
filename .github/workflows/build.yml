@@ -127,7 +127,7 @@ jobs:
             "name": "AhwakTV",
             "pluginClassName": "com.ahwaktv.AhwakTVPlugin",
             "requiresResources": false,
-            "version": 6
+            "version": 7
           }
           EOF
           cat > "$PACKAGE/BUILD-REPORT.md" <<EOF
