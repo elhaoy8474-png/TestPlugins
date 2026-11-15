@@ -253,10 +253,13 @@ class QFilm : MainAPI() {
             val clear = cipher.doFinal(payload).toString(Charsets.UTF_8)
             val stream = jsonString(clear, "url") ?: return false
             if (!stream.startsWith("http")) return false
-            callback(newExtractorLink(name, "QFilm - Byse", stream, ExtractorLinkType.M3U8) {
-                referer = "$frameBase/"
-                quality = Qualities.Unknown.value
-            })
+            // Use CloudStream HLS playlist expansion and preserve the Byse Referer.
+            M3u8Helper.generateM3u8(
+                "QFilm - Byse",
+                stream,
+                base,
+                headers = mapOf("Referer" to "$base/")
+            ).forEach(callback)
             true
         } catch (_: Exception) { false }
     }
