@@ -273,7 +273,7 @@ class AhwakTV : MainAPI() {
 
                 val label = titleOf(a).ifBlank { a.text().trim() }
                 val numberFromLabel = episodeNumber(label)
-                val episodeOnly = label.matches(Regex("""^\\s*[0-9٠-٩۰-۹]+\\s*(?:حلقة|الحلقة)?\\s*$"""))
+                val episodeOnly = label.matches(Regex("""^\s*[0-9٠-٩۰-۹]+\s*(?:حلقة|الحلقة)?\s*$"""))
                 val inEpisodeSection = pageHasEpisodes && episodeOnly
                 val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
 
