@@ -105,7 +105,7 @@ class Viu : MainAPI() {
     }
 
     private fun productUrl(id: String): String =
-        "$mainUrl/ott/$region/index.php?area_id=$areaId&language_flag_id=$languageFlagId&r=vod/ajax-detail&platform_flag_label=web&product_id=$id&ut=0"
+        "$mainUrl/ott/$region/index.php?r=vod/ajax-detail&platform_flag_label=web&product_id=$id&area_id=$areaId"
 
     private suspend fun productData(id: String): JSONObject? {
         return try {
