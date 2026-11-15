@@ -45,6 +45,9 @@ class Viu : MainAPI() {
         Regex("(?:viu://product/|/vod/)([0-9]+)").find(url)?.groupValues?.get(1)
             ?: url.takeIf { it.matches(Regex("[0-9]+")) }
 
+    private fun seriesId(url: String): String? =
+        Regex("viu://series/([0-9]+)").find(url)?.groupValues?.get(1)
+
     private fun poster(item: JSONObject): String? =
         item.optString("series_image_url").takeIf { it.startsWith("http") }
             ?: item.optString("cover_image_url").takeIf { it.startsWith("http") }
@@ -63,11 +66,20 @@ class Viu : MainAPI() {
             .ifBlank { fallbackName.trim() }
         if (title.isBlank()) return null
         val image = poster(item)
-        val isMovie = item.optInt("is_movie", 0) == 1
-        return if (isMovie) {
-            newMovieSearchResponse(title, "viu://product/$id", TvType.Movie) { posterUrl = image }
-        } else {
-            newTvSeriesSearchResponse(title, "viu://product/$id", TvType.TvSeries) { posterUrl = image }
+        val isMovie = item.optInt("is_movie", 0) == 1 ||
+            item.optString("is_movie").equals("true", true)
+        if (isMovie) {
+            val movieId = firstText(item, "product_id", "id")
+            if (movieId.isBlank()) return null
+            return newMovieSearchResponse(title, "viu://product/$movieId", TvType.Movie) {
+                posterUrl = image
+            }
+        }
+        // Viu series pages are keyed by series_id, not by the banner's product_id.
+        val showId = firstText(item, "series_id", "id", "product_id")
+        if (showId.isBlank()) return null
+        return newTvSeriesSearchResponse(title, "viu://series/$showId", TvType.TvSeries) {
+            posterUrl = image
         }
     }
 
@@ -182,11 +194,64 @@ class Viu : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse? {
         loadSiteSettings()
+
+        // Viu series are fetched by series_id through /vod/product-list.
+        // The home banner's product_id identifies an episode/product and is
+        // not a reliable identifier for the whole series.
+        val showId = seriesId(url)
+        if (showId != null) {
+            val listUrl = "$api/api/mobile?platform_flag_label=phone&os_flag_id=2&r=%2Fvod%2Fproduct-list&series_id=$showId&size=1000&area_id=$areaId&language_flag_id=$languageFlagId"
+            val headers = try {
+                val auth = token()
+                if (auth.isNullOrBlank()) webHeaders else webHeaders + mapOf("Authorization" to auth)
+            } catch (_: Exception) {
+                webHeaders
+            }
+            val root = try { json(app.get(listUrl, headers = headers).text) } catch (_: Exception) { null }
+                ?: return null
+            val data = root.optJSONObject("data") ?: return null
+            val products = data.optJSONArray("product_list")
+                ?: data.optJSONArray("products")
+                ?: return null
+            val episodes = mutableListOf<Episode>()
+            var detectedTitle = ""
+            var seriesImage: String? = null
+            var seriesDescription = ""
+            for (i in 0 until products.length()) {
+                val item = products.optJSONObject(i) ?: continue
+                val episodeId = firstText(item, "product_id", "id")
+                if (episodeId.isBlank() || episodeId == "0") continue
+                val number = firstText(item, "number", "product_number", "episode_number").toIntOrNull()
+                val synopsis = firstText(item, "synopsis", "name", "title")
+                if (detectedTitle.isBlank()) {
+                    detectedTitle = firstText(item, "series_category_name", "series_name", "series_name_en")
+                    if (detectedTitle.isBlank() && synopsis.contains("-")) {
+                        detectedTitle = synopsis.substringBefore("-").trim()
+                    }
+                }
+                if (seriesImage == null) seriesImage = poster(item)
+                if (seriesDescription.isBlank()) seriesDescription = firstText(item, "description")
+                val episodeTitle = synopsis.ifBlank { "الحلقة ${number ?: i + 1}" }
+                episodes.add(newEpisode("viu://product/$episodeId") {
+                    name = episodeTitle
+                    episode = number ?: (i + 1)
+                    season = 1
+                    posterUrl = poster(item) ?: seriesImage
+                    description = firstText(item, "description")
+                })
+            }
+            if (episodes.isEmpty()) return null
+            val sorted = episodes.sortedWith(compareBy<Episode> { it.episode ?: Int.MAX_VALUE })
+            val title = detectedTitle.ifBlank { "Viu - $showId" }
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, sorted) {
+                posterUrl = seriesImage
+                plot = seriesDescription
+            }
+        }
+
         val id = productId(url) ?: return null
         val data = productData(id) ?: return null
-        val current = data.optJSONObject("current_product")
-            ?: data.optJSONObject("product")
-            ?: return null
+        val current = data.optJSONObject("current_product") ?: return null
         val series = data.optJSONObject("series") ?: JSONObject()
         val title = firstText(series, "name", "series_name", "title")
             .ifBlank { firstText(current, "series_name", "name", "title", "synopsis", "product_synopsis") }
@@ -194,51 +259,13 @@ class Viu : MainAPI() {
         val image = poster(current) ?: poster(series)
         val description = firstText(current, "description", "synopsis", "product_synopsis")
             .ifBlank { firstText(series, "description", "synopsis") }
-        val isMovie = current.optInt("is_movie", 0) == 1 ||
-            current.optString("is_movie").equals("true", true)
-        if (isMovie) {
+        if (current.optInt("is_movie", 0) == 1) {
             return newMovieLoadResponse(title, url, TvType.Movie, "viu://product/$id") {
                 posterUrl = image
                 plot = description
             }
         }
-        val products = series.optJSONArray("product")
-            ?: data.optJSONArray("product")
-            ?: series.optJSONArray("episodes")
-            ?: JSONArray()
-        val episodes = mutableListOf<Episode>()
-        for (i in 0 until products.length()) {
-            val item = products.optJSONObject(i) ?: continue
-            val episodeId = firstText(item, "product_id", "id")
-            if (episodeId.isBlank() || episodeId == "0") continue
-            val number = firstText(item, "number", "product_number", "episode_number").toIntOrNull()
-            val episodeName = firstText(item, "synopsis", "name", "title")
-                .ifBlank { "الحلقة ${number ?: i + 1}" }
-            episodes.add(newEpisode("viu://product/$episodeId") {
-                name = episodeName
-                episode = number ?: (i + 1)
-                season = 1
-                posterUrl = poster(item) ?: image
-            })
-        }
-        val sorted = episodes.sortedWith(
-            compareBy<Episode> { it.episode ?: Int.MAX_VALUE }
-        ).toMutableList()
-        if (sorted.isEmpty()) {
-            val number = firstText(current, "number", "product_number", "episode_number").toIntOrNull()
-            val currentId = firstText(current, "product_id", "id").ifBlank { id }
-            sorted.add(newEpisode("viu://product/$currentId") {
-                name = firstText(current, "synopsis", "name", "title")
-                    .ifBlank { "الحلقة ${number ?: 1}" }
-                episode = number ?: 1
-                season = 1
-                posterUrl = image
-            })
-        }
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, sorted) {
-            posterUrl = image
-            plot = description
-        }
+        return null
     }
 
     override suspend fun loadLinks(
