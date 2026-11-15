@@ -83,7 +83,7 @@ class Viu : MainAPI() {
             }.toString()
             val url = "$api/api/auth/token?v=${System.currentTimeMillis()}"
             val headers = webHeaders + mapOf("Content-Type" to "application/json", "Accept" to "application/json")
-            val response = json(app.post(url, data = body, headers = headers).text) ?: return null
+            val response = json(app.post(url, headers = headers, json = JSONObject(body)).text) ?: return null
             val raw = response.optString("token").ifBlank {
                 response.optJSONObject("data")?.optString("token").orEmpty()
             }
