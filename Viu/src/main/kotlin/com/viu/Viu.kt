@@ -104,8 +104,11 @@ class Viu : MainAPI() {
         } catch (_: Exception) { null }
     }
 
+    // Match the proven Viu OTT detail request used by the Kodi Viu add-on.
+    // Both area_id and language_flag_id are required for region/language-specific
+    // series metadata, and ut=0 is part of the established request.
     private fun productUrl(id: String): String =
-        "$mainUrl/ott/$region/index.php?r=vod/ajax-detail&platform_flag_label=web&product_id=$id&area_id=$areaId"
+        "$mainUrl/ott/$region/index.php?area_id=$areaId&language_flag_id=$languageFlagId&r=vod/ajax-detail&platform_flag_label=web&product_id=$id&ut=0"
 
     private suspend fun productData(id: String): JSONObject? {
         return try {
