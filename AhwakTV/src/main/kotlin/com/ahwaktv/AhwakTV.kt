@@ -254,12 +254,7 @@ class AhwakTV : MainAPI() {
             val numberFromLabel = episodeNumber(label)
             val episodeOnly = label.matches(Regex("""^\s*[0-9٠-٩۰-۹]+\s*(?:حلقة|الحلقة)?\s*$"""))
             val pageHasEpisodes = hasEpisodeSection(doc)
-            val inEpisodeSection = pageHasEpisodes && (
-                episodeOnly || a.parents().take(5).any { parent ->
-                    parent.text().contains("المواسم والحلقات", ignoreCase = true) ||
-                        parent.classNames().any { it.contains("episode", true) || it.contains("season", true) }
-                }
-            )
+            val inEpisodeSection = pageHasEpisodes && episodeOnly
             val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
 
             if (seriesName != null && !sameSeries && !inEpisodeSection) {
