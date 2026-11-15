@@ -60,6 +60,7 @@ jobs:
           PACKAGE="$GITHUB_WORKSPACE/artifacts/AhwakTV-Source"
           mkdir -p "$PACKAGE"
           cp -R "$GITHUB_WORKSPACE/src/AhwakTV" "$PACKAGE/"
+          rm -rf "$PACKAGE/AhwakTV/build"
           cp "$GITHUB_WORKSPACE/src/build.gradle.kts" "$PACKAGE/"
           cp "$GITHUB_WORKSPACE/src/settings.gradle.kts" "$PACKAGE/"
           cp "$GITHUB_WORKSPACE/src/gradle.properties" "$PACKAGE/"
@@ -104,6 +105,23 @@ jobs:
           ## حالة الاختبار
           نجاح بناء Gradle والتحقق من إنشاء ملف `.cs3` وقائمة `plugins.json` لا يثبت وحده أن كل خادم فيديو يعمل داخل التطبيق. يلزم اختبار تشغيل فعلي على KodaStream مع صفحة/حلقة متاحة.
           EOF
+          cat > "$PACKAGE/COMPATIBILITY-AR.md" <<'EOF'
+          # مراجعة توافق KodaStream
+
+          تمت مراجعة أرشيف cloudSTREAM3-main.zip مباشرةً. القيم الموجودة في مشروع المضيف:
+          - Gradle Wrapper: 9.4.1
+          - Android Gradle Plugin: 9.1.1
+          - Kotlin Gradle Plugin: 2.4.0
+          - هدف JVM في مكتبة المضيف: 11
+
+          واجهات المصدر التي تمت مراجعتها:
+          - MainAPI: getMainPage(page, request), search(query, page), quickSearch(query), load(url)، وloadLinks(data, isCasting, subtitleCallback, callback).
+          - BasePlugin: registerMainAPI(MainAPI) وregisterExtractorAPI(ExtractorApi).
+          - ExtractorApi: getUrl(url, referer, subtitleCallback, callback)، كما يوفر المضيف loadExtractor(url, referer, subtitleCallback, callback).
+          - PluginManager: يتوقع ملف .cs3 يحتوي classes.dex وmanifest.json، ثم يقرأ pluginClassName وrequiresResources ويحمل الصنف عبر PathClassLoader.
+
+          نقطة مهمة عن الاختبار: بناء هذه الإضافة تم عبر قالب CloudStream للإضافات (Gradle 8.12 وAGP 8.7.3 وKotlin 2.4.0، مع اعتماد cloudstream3 pre-release). تمت مطابقة توقيعات API مع مصدر KodaStream المرفق، لكن البناء لم يكن مشروع Gradle فرعياً داخل نسخة KodaStream نفسها؛ لذلك يلزم تثبيت .cs3 واختباره على التطبيق الفعلي لإثبات التوافق وقت التشغيل.
+          EOF
           cat > "$PACKAGE/manifest-reference.json" <<'EOF'
           {
             "name": "AhwakTV",
@@ -121,6 +139,7 @@ jobs:
           EOF
           cd "$GITHUB_WORKSPACE/artifacts"
           zip -qr AhwakTV-Source.zip AhwakTV-Source
+          cp "$GITHUB_WORKSPACE/artifacts/AhwakTV-Source.zip" "$GITHUB_WORKSPACE/builds/AhwakTV-Source.zip"
 
       - name: Upload AhwakTV source and plugin
         uses: actions/upload-artifact@v4
