@@ -252,14 +252,14 @@ class AhwakTV : MainAPI() {
 
             val label = titleOf(a).ifBlank { a.text().trim() }
             val numberFromLabel = episodeNumber(label)
-            val episodeOnly = label.matches(Regex("""^\\s*[0-9٠-٩۰-۹]+\\s*(?:حلقة|الحلقة)?\\s*$"""))
+            val episodeOnly = label.matches(Regex("""^\s*[0-9٠-٩۰-۹]+\s*(?:حلقة|الحلقة)?\s*$"""))
             val inEpisodeSection = a.parents().take(5).any { parent ->
                 parent.text().contains("المواسم والحلقات", ignoreCase = true) ||
                     parent.classNames().any { it.contains("episode", true) || it.contains("season", true) }
             }
             val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
 
-            if (seriesName != null && !sameSeries && !(episodeOnly && inEpisodeSection) && !inEpisodeSection) {
+            if (seriesName != null && !sameSeries && !inEpisodeSection) {
                 continue
             }
             if (label.isBlank() && !episodeOnly) continue
@@ -269,7 +269,7 @@ class AhwakTV : MainAPI() {
                     it.attr("data-season") + " " +
                     (it.selectFirst("h2,h3,h4")?.text() ?: "")
             }
-            val season = Regex("(?:الموسم|season|\\\\bS\\\\s*)[^0-9]{0,6}(\\\\d+)", RegexOption.IGNORE_CASE)
+            val season = Regex("(?:الموسم|season|\\bS\\s*)[^0-9]{0,6}(\\d+)", RegexOption.IGNORE_CASE)
                 .find(digits(context))?.groupValues?.get(1)?.toIntOrNull() ?: 1
             val nextIndex = (counts[season] ?: 0) + 1
             val number = numberFromLabel ?: nextIndex
@@ -310,27 +310,27 @@ class AhwakTV : MainAPI() {
 
     private fun baseSeriesTitle(title: String): String {
         val withoutPrefix = title.trim().replace(
-            Regex("^(?:مسلسل|انمي|أنمي|برنامج)\\\\s*", RegexOption.IGNORE_CASE),
+            Regex("^(?:مسلسل|انمي|أنمي|برنامج)\\s*", RegexOption.IGNORE_CASE),
             ""
         )
         val withoutEpisode = withoutPrefix.replace(
-            Regex("\\\\s*(?:الحلقة|حلقة|episode|ep\\\\.?|الموسم|season)\\\\s*.*$", RegexOption.IGNORE_CASE),
+            Regex("\\s*(?:الحلقة|حلقة|episode|ep\\.?|الموسم|season)\\s*.*$", RegexOption.IGNORE_CASE),
             ""
         )
         return withoutEpisode.replace(
-            Regex("\\\\s+(?:HD|FHD|FULL\\\\s*HD|مترجم|مدبلج|كامل)+$", RegexOption.IGNORE_CASE),
+            Regex("\\s+(?:HD|FHD|FULL\\s*HD|مترجم|مدبلج|كامل)+$", RegexOption.IGNORE_CASE),
             ""
         ).trim(' ', '-', ':', '|')
     }
 
     private fun normalizeTitle(value: String): String =
-        value.lowercase().replace(Regex("[\\\\s\\\\p{Punct}ـ]+"), "")
+        value.lowercase().replace(Regex("[\\s\\p{Punct}ـ]+"), "")
 
     private fun episodeNumber(value: String): Int? {
         val normalized = digits(value)
         val patterns = listOf(
-            Regex("(?:الحلقة|حلقة|episode|ep\\\\.?)[^0-9]{0,8}(\\\\d+)", RegexOption.IGNORE_CASE),
-            Regex("(\\\\d+)\\\\s*(?:الحلقة|حلقة|episode|ep\\\\.?)", RegexOption.IGNORE_CASE),
+            Regex("(?:الحلقة|حلقة|episode|ep\\.?)[^0-9]{0,8}(\\d+)", RegexOption.IGNORE_CASE),
+            Regex("(\\d+)\\s*(?:الحلقة|حلقة|episode|ep\\.?)", RegexOption.IGNORE_CASE),
         )
         return patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1)?.toIntOrNull() }
     }
