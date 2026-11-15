@@ -367,8 +367,8 @@ class AhwakTV : MainAPI() {
         a.attr("title"),
         a.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
         a.selectFirst("img")?.attr("alt").orEmpty(),
-        a.parent()?.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
         a.text(),
+        a.parent()?.selectFirst("h2,h3,h4,.title,.name")?.text().orEmpty(),
     ).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
 
     private fun baseSeriesTitle(title: String): String {
