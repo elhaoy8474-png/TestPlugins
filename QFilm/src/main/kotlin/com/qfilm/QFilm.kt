@@ -89,7 +89,8 @@ class QFilm : MainAPI() {
                 val episodeHtml = app.get(episodeUrl, headers = mapOf("Referer" to "https://a.qfilm.cam/")).text
                 val episodeDoc = Jsoup.parse(episodeHtml, episodeUrl)
                 val seriesAnchor = episodeDoc.selectFirst("a[href*='/series/']") ?: continue
-                val seriesUrl = seriesAnchor.absUrl("href").ifBlank { continue }
+                val seriesUrl = seriesAnchor.absUrl("href")
+                if (seriesUrl.isBlank()) continue
                 val title = seriesAnchor.attr("title").ifBlank { seriesAnchor.text() }
                     .ifBlank { fallbackTitle }.trim()
                 if (title.isBlank()) continue
