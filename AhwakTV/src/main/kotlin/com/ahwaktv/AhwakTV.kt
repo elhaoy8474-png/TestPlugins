@@ -253,10 +253,13 @@ class AhwakTV : MainAPI() {
             val label = titleOf(a).ifBlank { a.text().trim() }
             val numberFromLabel = episodeNumber(label)
             val episodeOnly = label.matches(Regex("""^\s*[0-9٠-٩۰-۹]+\s*(?:حلقة|الحلقة)?\s*$"""))
-            val inEpisodeSection = a.parents().take(5).any { parent ->
-                parent.text().contains("المواسم والحلقات", ignoreCase = true) ||
-                    parent.classNames().any { it.contains("episode", true) || it.contains("season", true) }
-            }
+            val pageHasEpisodes = hasEpisodeSection(doc)
+            val inEpisodeSection = pageHasEpisodes && (
+                episodeOnly || a.parents().take(5).any { parent ->
+                    parent.text().contains("المواسم والحلقات", ignoreCase = true) ||
+                        parent.classNames().any { it.contains("episode", true) || it.contains("season", true) }
+                }
+            )
             val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
 
             if (seriesName != null && !sameSeries && !inEpisodeSection) {
@@ -269,8 +272,7 @@ class AhwakTV : MainAPI() {
                     it.attr("data-season") + " " +
                     (it.selectFirst("h2,h3,h4")?.text() ?: "")
             }
-            val season = Regex("(?:الموسم|season|\\bS\\s*)[^0-9]{0,6}(\\d+)", RegexOption.IGNORE_CASE)
-                .find(digits(context))?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            val season = seasonNumber(context) ?: 1
             val nextIndex = (counts[season] ?: 0) + 1
             val number = numberFromLabel ?: nextIndex
             counts[season] = maxOf(nextIndex, number)
@@ -326,13 +328,53 @@ class AhwakTV : MainAPI() {
     private fun normalizeTitle(value: String): String =
         value.lowercase().replace(Regex("[\\s\\p{Punct}ـ]+"), "")
 
+    private fun seasonNumber(value: String): Int? {
+        val normalized = digits(value)
+        Regex("(?:الموسم|season|\\bS\\s*)[^0-9]{0,8}(\\d+)", RegexOption.IGNORE_CASE)
+            .find(normalized)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+
+        val lower = value.lowercase()
+        val ordinals = listOf(
+            listOf("الأول", "الاول", "الأولى", "الاولى", "first", "one") to 1,
+            listOf("الثاني", "الثانية", "second", "two") to 2,
+            listOf("الثالث", "الثالثة", "third", "three") to 3,
+            listOf("الرابع", "الرابعة", "fourth", "four") to 4,
+            listOf("الخامس", "الخامسة", "fifth", "five") to 5,
+            listOf("السادس", "السادسة", "sixth", "six") to 6,
+            listOf("السابع", "السابعة", "seventh", "seven") to 7,
+            listOf("الثامن", "الثامنة", "eighth", "eight") to 8,
+            listOf("التاسع", "التاسعة", "ninth", "nine") to 9,
+            listOf("العاشر", "العاشرة", "tenth", "ten") to 10,
+        )
+        return ordinals.firstOrNull { (words, _) ->
+            words.any { lower.contains(it) }
+        }?.second
+    }
+
     private fun episodeNumber(value: String): Int? {
         val normalized = digits(value)
         val patterns = listOf(
             Regex("(?:الحلقة|حلقة|episode|ep\\.?)[^0-9]{0,8}(\\d+)", RegexOption.IGNORE_CASE),
             Regex("(\\d+)\\s*(?:الحلقة|حلقة|episode|ep\\.?)", RegexOption.IGNORE_CASE),
         )
-        return patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1)?.toIntOrNull() }
+        patterns.firstNotNullOfOrNull { it.find(normalized)?.groupValues?.get(1)?.toIntOrNull() }?.let { return it }
+
+        val lower = normalized.lowercase()
+        val ordinals = listOf(
+            listOf("الأولى", "الاولى", "الأول", "الاول", "first", "one") to 1,
+            listOf("الثانية", "الثاني", "second", "two") to 2,
+            listOf("الثالثة", "الثالث", "third", "three") to 3,
+            listOf("الرابعة", "الرابع", "fourth", "four") to 4,
+            listOf("الخامسة", "الخامس", "fifth", "five") to 5,
+            listOf("السادسة", "السادس", "sixth", "six") to 6,
+            listOf("السابعة", "السابع", "seventh", "seven") to 7,
+            listOf("الثامنة", "الثامن", "eighth", "eight") to 8,
+            listOf("التاسعة", "التاسع", "ninth", "nine") to 9,
+            listOf("العاشرة", "العاشر", "tenth", "ten") to 10,
+        )
+        return ordinals.firstNotNullOfOrNull { (words, number) ->
+            if (words.any { lower.contains(it) }) number else null
+        }
     }
 
     private fun seriesTitleFromPage(doc: Document, fallback: String): String {
@@ -359,7 +401,8 @@ class AhwakTV : MainAPI() {
     }
 
     private fun typeOf(title: String, fallback: TvType? = null): TvType? = when {
-        title.contains("فيلم") || title.contains("أفلام") || title.contains("افلام") -> TvType.Movie
+        title.contains("فيلم") || title.contains("أفلام") || title.contains("افلام") ||
+            title.contains("مسرحية") -> TvType.Movie
         title.contains("أنمي") || title.contains("انمي") || title.contains("anime", true) -> TvType.Anime
         title.contains("كرتون") || title.contains("cartoon", true) -> TvType.Cartoon
         title.contains("مسلسل") || title.contains("برنامج") ||
