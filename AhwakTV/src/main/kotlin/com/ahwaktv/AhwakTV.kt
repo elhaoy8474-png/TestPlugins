@@ -74,8 +74,9 @@ class AhwakTV : MainAPI() {
         val title = doc.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
             ?.takeIf { it.isNotBlank() } ?: doc.selectFirst("h1")?.text()?.trim()
             ?.takeIf { it.isNotBlank() } ?: url.substringBefore('?').substringAfterLast('/').substringBefore('.').ifBlank { "AhwakTV" }
-        val poster = doc.selectFirst("meta[property=og:image]")?.let { it.absUrl("content") }
+        val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")?.trim()
             ?.takeIf { it.isNotBlank() }
+            ?.let { image -> if (image.startsWith("http")) image else mainUrl + "/" + image.trimStart('/') }
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")?.trim()
         val path = url.substringBefore('?').substringAfterLast('/')
         val episodes = episodes(doc, poster)
