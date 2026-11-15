@@ -119,7 +119,7 @@ class Viu : MainAPI() {
         val items = mutableListOf<SearchResponse>()
         // The live Viu web/mobile gateway exposes the home catalogue at /home/index.
         // The former /ott/eg/index.php?r=home/ajax-index URL is not the catalogue API.
-        val url = "$api/api/mobile?r=/home/index&platform_flag_label=web&language_flag_id=$languageFlagId&ut=0&area_id=$areaId"
+        val url = "$api/api/mobile?r=/home/index&platform_flag_label=phone&language_flag_id=$languageFlagId&ut=0&area_id=$areaId"
         val root = try {
             json(app.get(url, headers = webHeaders).text)
         } catch (_: Exception) {
