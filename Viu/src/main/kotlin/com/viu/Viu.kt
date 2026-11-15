@@ -150,7 +150,7 @@ class Viu : MainAPI() {
             }.toString()
             val url = "$mainUrl/ott/$region/index.php?r=vod/jsonp&area_id=$areaId&language_flag_id=$languageFlagId&cpreference_id="
             val headers = webHeaders + mapOf("Content-Type" to "application/json")
-            val root = json(app.post(url, data = body, headers = headers).text) ?: return emptyList()
+            val root = json(app.post(url, headers = headers, json = JSONObject(body)).text) ?: return emptyList()
             val data = root.optJSONObject("data") ?: return emptyList()
             val out = mutableListOf<SearchResponse>()
             val series = data.optJSONArray("series") ?: JSONArray()
