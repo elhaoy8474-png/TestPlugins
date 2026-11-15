@@ -6,6 +6,10 @@ import org.jsoup.nodes.Element
 import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.net.URI
+import android.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 class QFilm : MainAPI() {
     override var mainUrl = "https://movie.qfilm.tv"
@@ -207,6 +211,48 @@ class QFilm : MainAPI() {
         }
     }
 
+    private fun jsonString(json: String, key: String): String? =
+        Regex(""""${key}"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1)
+
+    private fun decodeUrlBase64(value: String): ByteArray {
+        val normalized = value.replace('-', '+').replace('_', '/')
+        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
+        return Base64.decode(padded, Base64.DEFAULT)
+    }
+
+    // Native implementation of CloudStream's ByseSX extractor for QFilm's Byse player.
+    private suspend fun extractByse(embedUrl: String, callback: (ExtractorLink) -> Unit): Boolean {
+        return try {
+            val uri = URI(embedUrl)
+            val base = "${uri.scheme}://${uri.host}"
+            val code = uri.path.trimEnd('/').substringAfterLast('/')
+            if (code.isBlank()) return false
+            val details = app.get("$base/api/videos/$code/embed/details", headers = mapOf("Referer" to "$base/")).text
+            val frameUrl = jsonString(details, "embed_frame_url") ?: return false
+            val frameUri = URI(frameUrl)
+            val frameBase = "${frameUri.scheme}://${frameUri.host}"
+            val frameCode = frameUri.path.trimEnd('/').substringAfterLast('/')
+            if (frameCode.isBlank()) return false
+            val playback = app.get("$frameBase/api/videos/$frameCode/embed/playback", headers = mapOf(
+                "accept" to "*/*", "referer" to frameUrl, "x-embed-parent" to embedUrl
+            )).text
+            val iv = decodeUrlBase64(jsonString(playback, "iv") ?: return false)
+            val payload = decodeUrlBase64(jsonString(playback, "payload") ?: return false)
+            val parts = Regex(""""key_parts"\s*:\s*\[\s*"([^"]+)"\s*,\s*"([^"]+)"""").find(playback) ?: return false
+            val key = decodeUrlBase64(parts.groupValues[1]) + decodeUrlBase64(parts.groupValues[2])
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
+            val clear = cipher.doFinal(payload).toString(Charsets.UTF_8)
+            val stream = jsonString(clear, "url") ?: return false
+            if (!stream.startsWith("http")) return false
+            callback(newExtractorLink(name, "QFilm - Byse", stream, ExtractorLinkType.M3U8) {
+                referer = "$frameBase/"
+                quality = Qualities.Unknown.value
+            })
+            true
+        } catch (_: Exception) { false }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -230,6 +276,10 @@ class QFilm : MainAPI() {
                 var found = false
                 for (server in servers) {
                     try {
+                        if (server.contains("bysetayico.com", true) && extractByse(server, callback)) {
+                            found = true
+                            continue
+                        }
                         if (loadExtractor(server, playerUrl, subtitleCallback, callback)) {
                             found = true
                             continue
