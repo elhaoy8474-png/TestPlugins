@@ -85,6 +85,21 @@ class AhwakTV : MainAPI() {
         if (isCategory) {
             val kind = categoryType(url, title) ?: TvType.TvSeries
             val results = media(doc, kind)
+
+            // A category that contains one series (for example "Friends - all seasons")
+            // is treated as a series collection, not as a generic category page.
+            if (kind != TvType.Movie && results.size == 1) {
+                val seriesName = results.first().name
+                val extraDocs = categoryPages(url, doc)
+                val allEpisodes = episodes(doc, poster, seriesName, extraDocs = extraDocs)
+                if (allEpisodes.isNotEmpty()) {
+                    return newTvSeriesLoadResponse(seriesName, url, kind, allEpisodes) {
+                        posterUrl = poster
+                        this.plot = plot
+                    }
+                }
+            }
+
             return if (kind == TvType.Movie) {
                 newMovieLoadResponse(title, url, TvType.Movie, "") {
                     posterUrl = poster
@@ -210,8 +225,11 @@ class AhwakTV : MainAPI() {
 
             if (path == "view-serie.php") {
                 if (!seenUrls.add(url)) continue
+                val seriesName = baseSeriesTitle(title).ifBlank { title }
+                val key = normalizeTitle(seriesName)
+                if (key.isBlank() || !seenSeries.add(key)) continue
                 val kind = typeOf(title, fallbackType ?: TvType.TvSeries) ?: TvType.TvSeries
-                results += newTvSeriesSearchResponse(title, url, kind) {
+                results += newTvSeriesSearchResponse(seriesName, url, kind) {
                     posterUrl = posterOf(a)
                 }
                 continue
@@ -241,44 +259,45 @@ class AhwakTV : MainAPI() {
         poster: String?,
         seriesName: String?,
         currentUrl: String? = null,
+        extraDocs: List<Document> = emptyList(),
     ): List<Episode> {
         val result = linkedMapOf<String, Episode>()
         val counts = hashMapOf<Int, Int>()
         val seriesKey = normalizeTitle(seriesName.orEmpty())
 
-        for (a in doc.select("a[href*='watch.php']")) {
-            val url = a.absUrl("href")
-            if (!siteUrl(url)) continue
+        for (sourceDoc in listOf(doc) + extraDocs) {
+            val pageHasEpisodes = hasEpisodeSection(sourceDoc)
+            for (a in sourceDoc.select("a[href*='watch.php']")) {
+                val url = a.absUrl("href")
+                if (!siteUrl(url)) continue
 
-            val label = titleOf(a).ifBlank { a.text().trim() }
-            val numberFromLabel = episodeNumber(label)
-            val episodeOnly = label.matches(Regex("""^\s*[0-9٠-٩۰-۹]+\s*(?:حلقة|الحلقة)?\s*$"""))
-            val pageHasEpisodes = hasEpisodeSection(doc)
-            val inEpisodeSection = pageHasEpisodes && episodeOnly
-            val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
+                val label = titleOf(a).ifBlank { a.text().trim() }
+                val numberFromLabel = episodeNumber(label)
+                val episodeOnly = label.matches(Regex("""^\\s*[0-9٠-٩۰-۹]+\\s*(?:حلقة|الحلقة)?\\s*$"""))
+                val inEpisodeSection = pageHasEpisodes && episodeOnly
+                val sameSeries = seriesKey.isBlank() || normalizeTitle(label).contains(seriesKey)
 
-            if (seriesName != null && !sameSeries && !inEpisodeSection) {
-                continue
+                if (seriesName != null && !sameSeries && !inEpisodeSection) continue
+                if (label.isBlank() && !episodeOnly) continue
+
+                val context = a.parents().take(6).joinToString(" ") {
+                    it.id() + " " + it.classNames().joinToString(" ") + " " +
+                        it.attr("data-season") + " " +
+                        (it.selectFirst("h2,h3,h4")?.text() ?: "")
+                }
+                val season = seasonNumber(context) ?: seasonNumber(label) ?: 1
+                val nextIndex = (counts[season] ?: 0) + 1
+                val number = numberFromLabel ?: nextIndex
+                counts[season] = maxOf(nextIndex, number)
+                val displayName = if (episodeOnly) "الحلقة $number" else label
+
+                result.putIfAbsent(url, newEpisode(url) {
+                    name = displayName
+                    episode = number
+                    this.season = season
+                    posterUrl = poster
+                })
             }
-            if (label.isBlank() && !episodeOnly) continue
-
-            val context = a.parents().take(6).joinToString(" ") {
-                it.id() + " " + it.classNames().joinToString(" ") + " " +
-                    it.attr("data-season") + " " +
-                    (it.selectFirst("h2,h3,h4")?.text() ?: "")
-            }
-            val season = seasonNumber(context) ?: 1
-            val nextIndex = (counts[season] ?: 0) + 1
-            val number = numberFromLabel ?: nextIndex
-            counts[season] = maxOf(nextIndex, number)
-            val displayName = if (episodeOnly) "الحلقة $number" else label
-
-            result.putIfAbsent(url, newEpisode(url) {
-                name = displayName
-                episode = number
-                this.season = season
-                posterUrl = poster
-            })
         }
 
         if (currentUrl != null && siteUrl(currentUrl) && !result.containsKey(currentUrl)) {
@@ -287,7 +306,7 @@ class AhwakTV : MainAPI() {
             result[currentUrl] = newEpisode(currentUrl) {
                 name = currentTitle.ifBlank { "الحلقة $number" }
                 episode = number
-                season = 1
+                season = seasonNumber(currentTitle) ?: 1
                 posterUrl = poster
             }
         }
@@ -295,6 +314,26 @@ class AhwakTV : MainAPI() {
         return result.values.sortedWith(
             compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE }
         )
+    }
+
+    private suspend fun categoryPages(url: String, firstDoc: Document): List<Document> {
+        val pages = mutableListOf<Document>()
+        val visited = hashSetOf(firstDoc.location().ifBlank { url })
+        var current = firstDoc
+
+        for (page in 2..20) {
+            val next = pageUrl(current, page) ?: nextUrl(current) ?: break
+            if (!siteUrl(next) || !visited.add(next)) break
+            val nextDoc = try {
+                app.get(next, headers = headers, referer = current.location().ifBlank { url }).document
+            } catch (_: Exception) {
+                break
+            }
+            pages += nextDoc
+            current = nextDoc
+            if (!hasNext(current, page)) break
+        }
+        return pages
     }
 
     private fun titleOf(a: Element): String = listOf(
