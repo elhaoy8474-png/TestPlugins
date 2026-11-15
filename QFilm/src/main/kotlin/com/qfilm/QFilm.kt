@@ -61,25 +61,50 @@ class QFilm : MainAPI() {
             .mapNotNull { it.toResult() }.distinctBy { it.url }
     }
 
-    private fun seriesResults(html: String): List<SearchResponse> {
+    private suspend fun seriesResults(html: String): List<SearchResponse> {
         val doc = Jsoup.parse(html, "https://a.qfilm.cam")
+        // QFilm's category pages are episode feeds, not series-card feeds.
+        // Resolve one episode per show and use its explicit "series page" link.
+        val candidates = linkedMapOf<String, Pair<String, String>>()
+        doc.select("a[href*='qdrama-']").forEach { a ->
+            val href = a.absUrl("href").ifBlank {
+                try { URI("https://a.qfilm.cam").resolve(a.attr("href")).toString() }
+                catch (_: Exception) { a.attr("href") }
+            }
+            val label = a.attr("title").ifBlank { a.text() }.trim()
+            if (href.isBlank() || label.isBlank()) return@forEach
+            val normalized = label
+                .replace(Regex("(?i)^مسلسل\\s*"), "")
+                .replace(Regex("(?i)\\s*(?:الموسم\\s*\\d+\\s*)?الحلقة.*$"), "")
+                .replace(Regex("(?i)\\s*(?:season\\s*\\d+\\s*)?episode.*$"), "")
+                .replace(Regex("(?i)\\s*ep\\.?\\s*\\d+.*$"), "")
+                .trim()
+            if (normalized.isBlank()) return@forEach
+            candidates.putIfAbsent(normalized.lowercase(), normalized to href)
+        }
+
         val results = linkedMapOf<String, SearchResponse>()
-        doc.select("a[href]").forEach { a ->
-            val href = a.attr("href")
-            if (!href.contains("qdrama-") && !href.contains("episode")) return@forEach
-            val title = a.attr("title").ifBlank { a.text() }.trim()
-            if (title.isBlank()) return@forEach
-            val seriesTitle = title.replace(Regex("(?i)\\s*(الموسم\\s*\\d+\\s*)?الحلقة.*$"), "").
-                replace(Regex("(?i)\\s*(season\\s*\\d+\\s*)?episode.*$"), "").trim()
-            if (seriesTitle.isBlank()) return@forEach
-            val image: Element? = a.selectFirst("img") ?: a.parent()?.selectFirst("img")
-            val poster: String? = image?.let { it.attr("data-src").ifBlank { it.attr("src") } }
-                ?.takeIf { it.isNotBlank() }?.let { try { URI("https://a.qfilm.cam").resolve(it).toString() } catch (_: Exception) { it } }
-            val absolute = try { URI("https://a.qfilm.cam").resolve(href).toString() } catch (_: Exception) { href }
-            results.putIfAbsent(seriesTitle.lowercase(), newTvSeriesSearchResponse(seriesTitle, absolute, TvType.TvSeries) { posterUrl = poster })
+        for ((fallbackTitle, episodeUrl) in candidates.values.take(20)) {
+            try {
+                val episodeHtml = app.get(episodeUrl, headers = mapOf("Referer" to "https://a.qfilm.cam/")).text
+                val episodeDoc = Jsoup.parse(episodeHtml, episodeUrl)
+                val seriesAnchor = episodeDoc.selectFirst("a[href*='/series/']") ?: continue
+                val seriesUrl = seriesAnchor.absUrl("href").ifBlank { continue }
+                val title = seriesAnchor.attr("title").ifBlank { seriesAnchor.text() }
+                    .ifBlank { fallbackTitle }.trim()
+                if (title.isBlank()) continue
+                val poster = episodeDoc.selectFirst("meta[property=og:image]")?.attr("content")
+                    ?.takeIf { it.startsWith("http") }
+                results.putIfAbsent(seriesUrl, newTvSeriesSearchResponse(title, seriesUrl, TvType.TvSeries) {
+                    posterUrl = poster
+                })
+            } catch (_: Exception) {
+                // A single unavailable episode must not break the category page.
+            }
         }
         return results.values.toList()
     }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page <= 1) request.data else {
             val separator = if (request.data.contains("?")) "&" else "?"
