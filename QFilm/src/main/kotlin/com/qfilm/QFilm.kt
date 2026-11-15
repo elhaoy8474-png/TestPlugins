@@ -17,7 +17,7 @@ class QFilm : MainAPI() {
     override var lang = "ar"
     override val hasMainPage = true
     override val hasDownloadSupport = false
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
+    override val supportedTypes = setOf(TvType.Movie)
 
     private fun resolveUrl(raw: String): String {
         val value = raw.trim().replace("\\/", "/").replace("&amp;", "&")
@@ -26,15 +26,7 @@ class QFilm : MainAPI() {
 
     override val mainPage = mainPageOf(
         "$mainUrl/" to "أفلام - الرئيسية",
-        "$mainUrl/category.php?cat=asian-movies" to "أفلام آسيوية",
-        "https://a.qfilm.cam/seriestv" to "المسلسلات - الكل",
-        "https://a.qfilm.cam/category/مسلسلات-عربية" to "مسلسلات عربية",
-        "https://a.qfilm.cam/category/مسلسلات-تركية" to "مسلسلات تركية",
-        "https://a.qfilm.cam/category/مسلسلات-اجنبية" to "مسلسلات أجنبية",
-        "https://a.qfilm.cam/category/مسلسلات-اسيوية" to "مسلسلات آسيوية",
-        "https://a.qfilm.cam/category/مسلسلات-اهواك" to "مسلسلات اهواك",
-        "https://a.qfilm.cam/category/مسلسلات-مصرية" to "مسلسلات مصرية",
-        "https://a.qfilm.cam/category/مسلسلات-هندية" to "مسلسلات هندية"
+        "$mainUrl/category.php?cat=asian-movies" to "أفلام آسيوية"
     )
 
     private fun Element.toResult(): SearchResponse? {
@@ -50,9 +42,7 @@ class QFilm : MainAPI() {
             it.attr("data-src").ifBlank { it.attr("data-original") }.ifBlank { it.attr("src") }
         }?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
         val url = resolveUrl(href)
-        return if (title.contains("مسلسل", true) && !title.contains("الحلقة", true)) {
-            newTvSeriesSearchResponse(title, url, TvType.TvSeries) { posterUrl = poster }
-        } else newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
+        return newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
     }
 
     private fun extractResults(html: String): List<SearchResponse> {
@@ -61,62 +51,13 @@ class QFilm : MainAPI() {
             .mapNotNull { it.toResult() }.distinctBy { it.url }
     }
 
-    private suspend fun seriesResults(html: String): List<SearchResponse> {
-        val doc = Jsoup.parse(html, "https://a.qfilm.cam")
-        // QFilm's category pages are episode feeds, not series-card feeds.
-        // Resolve one episode per show and use its explicit "series page" link.
-        val candidates = linkedMapOf<String, Pair<String, String>>()
-        doc.select("a[href*='qdrama-']").forEach { a ->
-            val href = a.absUrl("href").ifBlank {
-                try { URI("https://a.qfilm.cam").resolve(a.attr("href")).toString() }
-                catch (_: Exception) { a.attr("href") }
-            }
-            val label = a.attr("title").ifBlank { a.text() }.trim()
-            if (href.isBlank() || label.isBlank()) return@forEach
-            val normalized = label
-                .replace(Regex("(?i)^مسلسل\\s*"), "")
-                .replace(Regex("(?i)\\s*(?:الموسم\\s*\\d+\\s*)?الحلقة.*$"), "")
-                .replace(Regex("(?i)\\s*(?:season\\s*\\d+\\s*)?episode.*$"), "")
-                .replace(Regex("(?i)\\s*ep\\.?\\s*\\d+.*$"), "")
-                .trim()
-            if (normalized.isBlank()) return@forEach
-            candidates.putIfAbsent(normalized.lowercase(), normalized to href)
-        }
-
-        val results = linkedMapOf<String, SearchResponse>()
-        for ((fallbackTitle, episodeUrl) in candidates.values.take(20)) {
-            try {
-                val episodeHtml = app.get(episodeUrl, headers = mapOf("Referer" to "https://a.qfilm.cam/")).text
-                val episodeDoc = Jsoup.parse(episodeHtml, episodeUrl)
-                val seriesAnchor = episodeDoc.selectFirst("a[href*='/series/']") ?: continue
-                val seriesUrl = seriesAnchor.absUrl("href")
-                if (seriesUrl.isBlank()) continue
-                val title = seriesAnchor.attr("title").ifBlank { seriesAnchor.text() }
-                    .ifBlank { fallbackTitle }.trim()
-                if (title.isBlank()) continue
-                val poster = episodeDoc.selectFirst("meta[property=og:image]")?.attr("content")
-                    ?.takeIf { it.startsWith("http") }
-                results.putIfAbsent(seriesUrl, newTvSeriesSearchResponse(title, seriesUrl, TvType.TvSeries) {
-                    posterUrl = poster
-                })
-            } catch (_: Exception) {
-                // A single unavailable episode must not break the category page.
-            }
-        }
-        return results.values.toList()
-    }
-
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page <= 1) request.data else {
             val separator = if (request.data.contains("?")) "&" else "?"
             request.data + separator + "page=$page"
         }
         val html = app.get(url, headers = mapOf("Referer" to "$mainUrl/")).text
-        return if (request.data.contains("a.qfilm.cam")) {
-            newHomePageResponse(request.name, seriesResults(html))
-        } else {
-            newHomePageResponse(request.name, extractResults(html))
-        }
+        return newHomePageResponse(request.name, extractResults(html))
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
@@ -126,52 +67,6 @@ class QFilm : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        if (url.contains("a.qfilm.cam")) {
-            val episodePage = app.get(url, headers = mapOf("Referer" to "https://a.qfilm.cam/")).text
-            val episodeDoc = Jsoup.parse(episodePage, url)
-            val seriesUrl = if (url.contains("/series/")) url else episodeDoc.selectFirst("a[href*='/series/']")?.absUrl("href").orEmpty()
-            if (seriesUrl.isNotBlank()) {
-                val seriesHtml = if (seriesUrl == url) episodePage else app.get(seriesUrl, headers = mapOf("Referer" to url)).text
-                val doc = Jsoup.parse(seriesHtml, seriesUrl)
-                val title = doc.selectFirst("meta[property=og:title]")?.attr("content")?.takeIf { it.isNotBlank() }
-                    ?: doc.selectFirst("h1")?.text()?.trim() ?: doc.title()
-                val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }
-                val plot = doc.selectFirst("meta[name=description]")?.attr("content")
-                // Filter out recommendation cards: only keep links whose URL belongs to this series.
-                val seriesSlug = try { URI(seriesUrl).path.trimEnd('/').substringAfterLast('/').lowercase() } catch (_: Exception) { "" }
-                val episodeContainers = doc.select(
-                    ".episodes-list, .episode-list, .episodes, .all-episodes, .season-episodes, #episodes, #episode-list"
-                )
-                val episodeRoot = episodeContainers.firstOrNull() ?: doc
-                val seen = hashSetOf<String>()
-                val episodes = episodeRoot.select("a[href]").mapNotNull { a ->
-                    val href = a.attr("href")
-                    if (!href.contains("qdrama-", true)) return@mapNotNull null
-                    val episodeUrl = a.absUrl("href").ifBlank {
-                        try { URI("https://a.qfilm.cam").resolve(href).toString() }
-                        catch (_: Exception) { href }
-                    }
-                    val episodePath = try { URI(episodeUrl).path.lowercase() } catch (_: Exception) { episodeUrl.lowercase() }
-                    if (seriesSlug.isNotBlank() && !episodePath.contains(seriesSlug)) return@mapNotNull null
-                    val label = a.attr("title").ifBlank { a.text() }.trim()
-                    if (!seen.add(episodeUrl)) return@mapNotNull null
-                    val seasonMatch = Regex("(?i)(?:الموسم|season)\\s*(\\d+)").find(label)
-                    val number = episodeNumber(label, episodeUrl)
-                    Triple(episodeUrl to label, number, seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1)
-                }.map { item ->
-                    newEpisode(data = item.first.first) {
-                        name = item.first.second.ifBlank { "الحلقة " + (item.second?.toString() ?: "") }
-                        episode = item.second
-                        season = item.third
-                        posterUrl = poster
-                    }
-                }.sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
-                return newTvSeriesLoadResponse(title, seriesUrl, TvType.TvSeries, episodes) {
-                    posterUrl = poster
-                    this.plot = plot
-                }
-            }
-        }
         val html = app.get(url, headers = mapOf("Referer" to "$mainUrl/")).text
         val doc = Jsoup.parse(html, url)
         val title = doc.selectFirst("meta[property=og:title]")?.attr("content")
@@ -181,124 +76,10 @@ class QFilm : MainAPI() {
         val poster: String? = doc.selectFirst("meta[property=og:image]")?.attr("content")
             ?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
         val plot = doc.selectFirst("meta[name=description]")?.attr("content")
-        val episodes = mutableListOf<Episode>()
-        val seen = hashSetOf<String>()
-        doc.select("a[href*='watch.php?vid='], a[href*='play.php?vid=']").forEach { element ->
-            val episodeUrl = resolveUrl(element.attr("href"))
-            val episodeId = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
-                .find(episodeUrl)?.groupValues?.get(1) ?: return@forEach
-            if (!seen.add(episodeId)) return@forEach
-            val label = element.attr("title").ifBlank { element.text() }.trim()
-            if (!label.contains("حلقة", true) && !label.contains("episode", true)) return@forEach
-            val number = episodeNumber(label, episodeUrl) ?: (episodes.size + 1)
-            episodes.add(newEpisode(data = episodeUrl) {
-                name = label.ifBlank { "الحلقة $number" }
-                episode = number
-                season = 1
-                posterUrl = poster
-            })
-        }
-        if (episodes.isNotEmpty()) {
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                posterUrl = poster
-                this.plot = plot
-            }
-        }
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             posterUrl = poster
             this.plot = plot
         }
-    }
-
-    // Same packed-JavaScript fallback used by the working AhwakTV provider.
-    private fun unpackPackedJs(source: String): String? {
-        val eval = Regex(
-            """eval\s*\(\s*function\s*\(.*?\)\s*\{.*?\}\s*\((.*)\)\s*\)""",
-            setOf(RegexOption.DOT_MATCHES_ALL)
-        ).find(source) ?: return null
-        val args = Regex(
-            """['"](.+?)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*['"](.+?)['"]\.split\s*\(['"]\|['"]\)""",
-            setOf(RegexOption.DOT_MATCHES_ALL)
-        ).find(eval.groupValues[1]) ?: return null
-        val packed = args.groupValues[1]
-        val radix = args.groupValues[2].toIntOrNull() ?: return null
-        val count = args.groupValues[3].toIntOrNull() ?: return null
-        val keys = args.groupValues[4].split('|')
-        val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        fun base(value: Int): String {
-            if (value == 0) return "0"
-            var n = value
-            val out = StringBuilder()
-            while (n > 0) {
-                out.insert(0, chars[n % radix])
-                n /= radix
-            }
-            return out.toString()
-        }
-        val replacements = HashMap<String, String>()
-        for (i in 0 until count) keys.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let {
-            replacements[base(i)] = it
-        }
-        return Regex("""\b\w+\b""").replace(packed) { match ->
-            replacements[match.value] ?: match.value
-        }
-    }
-
-    private fun jsonString(json: String, key: String): String? =
-        Regex(""""${key}"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1)
-
-    private fun episodeNumber(label: String, url: String = ""): Int? {
-        val text = "$label $url".map {
-            if (it in '\u0660'..'\u0669') ('0' + (it - '\u0660')) else it
-        }.joinToString("")
-        val patterns = listOf(
-            Regex("(?i)الحلقة\\s*#?\\s*(\\d+)"),
-            Regex("(?i)episode\\s*#?\\s*(\\d+)"),
-            Regex("(?i)ep\\.?\\s*#?\\s*(\\d+)"),
-            Regex("(?i)[-_/]s(\\d+)(?:\\.html?)?/?$")
-        )
-        return patterns.firstNotNullOfOrNull { it.find(text)?.groupValues?.get(1)?.toIntOrNull() }
-    }
-    private fun decodeUrlBase64(value: String): ByteArray {
-        val normalized = value.replace('-', '+').replace('_', '/')
-        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
-        return Base64.decode(padded, Base64.DEFAULT)
-    }
-
-    // Native implementation of CloudStream's ByseSX extractor for QFilm's Byse player.
-    private suspend fun extractByse(embedUrl: String, callback: (ExtractorLink) -> Unit): Boolean {
-        return try {
-            val uri = URI(embedUrl)
-            val base = "${uri.scheme}://${uri.host}"
-            val code = uri.path.trimEnd('/').substringAfterLast('/')
-            if (code.isBlank()) return false
-            val details = app.get("$base/api/videos/$code/embed/details", headers = mapOf("Referer" to "$base/")).text
-            val frameUrl = jsonString(details, "embed_frame_url") ?: return false
-            val frameUri = URI(frameUrl)
-            val frameBase = "${frameUri.scheme}://${frameUri.host}"
-            val frameCode = frameUri.path.trimEnd('/').substringAfterLast('/')
-            if (frameCode.isBlank()) return false
-            val playback = app.get("$frameBase/api/videos/$frameCode/embed/playback", headers = mapOf(
-                "accept" to "*/*", "referer" to frameUrl, "x-embed-parent" to embedUrl
-            )).text
-            val iv = decodeUrlBase64(jsonString(playback, "iv") ?: return false)
-            val payload = decodeUrlBase64(jsonString(playback, "payload") ?: return false)
-            val parts = Regex(""""key_parts"\s*:\s*\[\s*"([^"]+)"\s*,\s*"([^"]+)"""").find(playback) ?: return false
-            val key = decodeUrlBase64(parts.groupValues[1]) + decodeUrlBase64(parts.groupValues[2])
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
-            val clear = cipher.doFinal(payload).toString(Charsets.UTF_8)
-            val stream = jsonString(clear, "url") ?: return false
-            if (!stream.startsWith("http")) return false
-            // Use CloudStream HLS playlist expansion and preserve the Byse Referer.
-            M3u8Helper.generateM3u8(
-                "QFilm - Byse",
-                stream,
-                base,
-                headers = mapOf("Referer" to "$base/")
-            ).forEach(callback)
-            true
-        } catch (_: Exception) { false }
     }
 
     override suspend fun loadLinks(
@@ -307,56 +88,6 @@ class QFilm : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.contains("a.qfilm.cam")) {
-            val cleanUrl = data.substringBefore("?").trimEnd('/')
-            val slug = cleanUrl.substringAfterLast('/')
-            val playerUrl = if (cleanUrl.contains("/watch/")) cleanUrl + "/servers" else "https://a.qfilm.cam/watch/$slug/servers"
-            return try {
-                val playerHtml = app.get(playerUrl, headers = mapOf("Referer" to data, "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")).text
-                val playerDoc = Jsoup.parse(playerHtml, playerUrl)
-                val servers = linkedSetOf<String>()
-                playerDoc.select("iframe[src], iframe[data-src], a[href]").forEach { element ->
-                    val candidate = element.attr("src").ifBlank { element.attr("data-src") }.ifBlank { element.attr("href") }
-                    if (candidate.startsWith("http") && !candidate.contains("a.qfilm.cam")) servers.add(candidate)
-                }
-                // Try the CloudStream extractor first, then inspect the host page
-                // for native video/source tags or packed-JS file URLs (AhwakTV pattern).
-                var found = false
-                for (server in servers) {
-                    try {
-                        if (server.contains("bysetayico.com", true) && extractByse(server, callback)) {
-                            found = true
-                            continue
-                        }
-                        if (loadExtractor(server, playerUrl, subtitleCallback, callback)) {
-                            found = true
-                            continue
-                        }
-                        val hostHtml = app.get(server, headers = mapOf(
-                            "Referer" to playerUrl,
-                            "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36"
-                        )).text
-                        val unpacked = unpackPackedJs(hostHtml) ?: hostHtml
-                        val hostDoc = Jsoup.parse(unpacked, server)
-                        val directFiles = linkedSetOf<String>()
-                        hostDoc.select("video[src], video source[src], source[src]").forEach { node ->
-                            node.absUrl("src").takeIf { it.startsWith("http") }?.let(directFiles::add)
-                        }
-                        Regex("""['"]?file['"]?\s*[:=]\s*['"](https?[^'"]+)['"]""", RegexOption.IGNORE_CASE)
-                            .findAll(unpacked).forEach { directFiles.add(it.groupValues[1].replace("\\/", "/")) }
-                        directFiles.forEach { file ->
-                            val type = if (file.contains(".m3u8", true)) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                            callback(newExtractorLink(name, "QFilm - ${server.substringAfter("://").substringBefore("/")}", file, type) {
-                                referer = server
-                                quality = Qualities.Unknown.value
-                            })
-                            found = true
-                        }
-                    } catch (_: Exception) { }
-                }
-                found
-            } catch (_: Exception) { false }
-        }
         val id = Regex("[?&]vid=([^&#]+)", RegexOption.IGNORE_CASE)
             .find(data)?.groupValues?.get(1) ?: return false
         val watchUrl = if (data.contains("watch.php", true)) data else "$mainUrl/watch.php?vid=$id"
