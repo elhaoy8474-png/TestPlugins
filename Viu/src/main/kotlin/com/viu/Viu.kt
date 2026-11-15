@@ -99,18 +99,27 @@ class Viu : MainAPI() {
         bearerToken?.let { return it }
         return try {
             val uuid = UUID.randomUUID().toString()
-            val body = JSONObject().apply {
-                put("countryCode", region.uppercase())
-                put("deviceId", uuid)
-                put("uuid", uuid)
-                put("platform", "browser")
-                put("platformFlagLabel", "web")
-                put("language", "en")
-                put("carrierId", "0")
-            }.toString()
+            val payload = mapOf(
+                "countryCode" to region.uppercase(),
+                "platform" to "android",
+                "platformFlagLabel" to "phone",
+                "language" to languageFlagId,
+                "deviceId" to uuid,
+                "dataTrackingDeviceId" to UUID.randomUUID().toString(),
+                "osVersion" to "33",
+                "appVersion" to "2.23.0",
+                "buildVersion" to "790",
+                "carrierId" to "0",
+                "carrierName" to "null",
+                "appBundleId" to "com.vuclip.viu",
+                "flavour" to "all"
+            )
             val url = "$api/api/auth/token?v=${System.currentTimeMillis()}"
-            val headers = webHeaders + mapOf("Content-Type" to "application/json", "Accept" to "application/json")
-            val response = json(app.post(url, headers = headers, json = JSONObject(body)).text) ?: return null
+            val headers = webHeaders + mapOf(
+                "Content-Type" to "application/x-www-form-urlencoded",
+                "Accept" to "application/json"
+            )
+            val response = json(app.post(url, headers = headers, data = payload).text) ?: return null
             val raw = response.optString("token").ifBlank {
                 response.optJSONObject("data")?.optString("token").orEmpty()
             }
