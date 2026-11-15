@@ -25,6 +25,7 @@ class Viu : MainAPI() {
     private var areaId = "1000"
     private var languageFlagId = "3"
     private var bearerToken: String? = null
+    private var tokenExpiryTime: Long = 0L
 
     override val mainPage = mainPageOf(
         "$mainUrl/ott/$region/en-us" to "Viu - المحتوى المتاح"
@@ -96,7 +97,9 @@ class Viu : MainAPI() {
     }
 
     private suspend fun token(): String? {
-        bearerToken?.let { return it }
+        // Viu access tokens expire; refresh before expiry to avoid later playback failures.
+        val now = System.currentTimeMillis() / 1000
+        bearerToken?.let { if (now < tokenExpiryTime - 60L) return it }
         return try {
             val uuid = UUID.randomUUID().toString()
             val payload = mapOf(
@@ -120,11 +123,20 @@ class Viu : MainAPI() {
                 "Accept" to "application/json"
             )
             val response = json(app.post(url, headers = headers, data = payload).text) ?: return null
+            val tokenData = response.optJSONObject("data")
             val raw = response.optString("token").ifBlank {
-                response.optJSONObject("data")?.optString("token").orEmpty()
+                tokenData?.optString("token").orEmpty()
             }
-            if (raw.isBlank()) null else {
+            if (raw.isBlank()) {
+                bearerToken = null
+                tokenExpiryTime = 0L
+                null
+            } else {
+                val expiresIn = response.optLong("expires_in",
+                    tokenData?.optLong("expires_in", 3600L) ?: 3600L
+                ).coerceAtLeast(120L)
                 bearerToken = if (raw.startsWith("Bearer ")) raw else "Bearer $raw"
+                tokenExpiryTime = now + expiresIn
                 bearerToken
             }
         } catch (_: Exception) { null }
