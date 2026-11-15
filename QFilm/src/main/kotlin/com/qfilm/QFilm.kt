@@ -120,8 +120,7 @@ class QFilm : MainAPI() {
                     if (label.isBlank() || !seen.add(episodeUrl)) return@mapNotNull null
                     episodeUrl to label
                 }.mapIndexed { index, item ->
-                    val digits = Regex("[0-9٠-٩]+").find(item.second)?.value
-                    val number = digits?.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }?.joinToString("")?.toIntOrNull() ?: index + 1
+                    val number = episodeNumber(item.second, item.first) ?: (index + 1)
                     val seasonMatch = Regex("(?i)(?:الموسم|season)\\s*(\\d+)").find(item.second)
                     newEpisode(data = item.first) {
                         name = item.second
@@ -129,7 +128,7 @@ class QFilm : MainAPI() {
                         season = seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
                         posterUrl = poster
                     }
-                }.distinctBy { "${it.season ?: 1}:${it.episode ?: -1}" }
+                }
                     .sortedWith(compareBy<Episode> { it.season ?: 1 }.thenBy { it.episode ?: Int.MAX_VALUE })
                 return newTvSeriesLoadResponse(title, seriesUrl, TvType.TvSeries, episodes) {
                     posterUrl = poster
@@ -155,9 +154,7 @@ class QFilm : MainAPI() {
             if (!seen.add(episodeId)) return@forEach
             val label = element.attr("title").ifBlank { element.text() }.trim()
             if (!label.contains("حلقة", true) && !label.contains("episode", true)) return@forEach
-            val numberText = Regex("[0-9٠-٩]+").find(label)?.value
-            val number = numberText?.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }
-                ?.joinToString("")?.toIntOrNull() ?: (episodes.size + 1)
+            val number = episodeNumber(label, episodeUrl) ?: (episodes.size + 1)
             episodes.add(newEpisode(data = episodeUrl) {
                 name = label.ifBlank { "الحلقة $number" }
                 episode = number
