@@ -89,8 +89,15 @@ class DramaBox : MainAPI() {
     private suspend fun post(path: String, body: JSONObject): JSONObject? {
         return try {
             val response = app.post("$api/$path", headers = apiHeaders, json = body)
-            JSONObject(response.text)
-        } catch (_: Exception) {
+            JSONObject(response.text).also { result ->
+                val apiStatus = result.optInt("status", 0)
+                if (apiStatus != 0) {
+                    android.util.Log.w("DramaBox", "API status $apiStatus for $path")
+                }
+            }
+        } catch (error: Exception) {
+            // Never log request headers or tokens; only the endpoint and exception type.
+            android.util.Log.w("DramaBox", "Request failed for $path (\${error.javaClass.simpleName})")
             null
         }
     }
@@ -135,31 +142,45 @@ class DramaBox : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val channelId = request.data.toIntOrNull() ?: 167
+        val pageNo = page.coerceAtLeast(1)
 
-        // The official Android client loads the recommendation feed from
-        // he001/recommendBook, not from the guessed theater payload.
-        // Captured request shape: isNeedRank, specialColumnId, pageNo, recSessionId.
-        val recommendationBody = JSONObject().apply {
-            put("isNeedRank", 1)
-            put("specialColumnId", if (channelId == 167) 0 else channelId)
-            put("pageNo", page.coerceAtLeast(1))
-            put("recSessionId", newRecSessionId())
-        }
-        var records = channelRecords(post("he001/recommendBook", recommendationBody))
-            ?: JSONArray()
-
-        // Keep the other known channel endpoint as a fallback for channel
-        // pages that are not represented by the recommendation feed.
-        if (records.length() == 0) {
-            val theaterBody = JSONObject().apply {
+        // recommendBook is verified for the general/popular feed only.
+        // Do not pass other channel IDs as specialColumnId: that parameter
+        // is a different field in the official API.
+        val isPopularFeed = channelId == 167
+        val firstBody = if (isPopularFeed) {
+            JSONObject().apply {
+                put("isNeedRank", 1)
+                put("specialColumnId", 0)
+                put("pageNo", pageNo)
+                put("recSessionId", newRecSessionId())
+            }
+        } else {
+            JSONObject().apply {
                 put("newChannelStyle", 1)
                 put("isNeedRank", 1)
-                put("pageNo", page.coerceAtLeast(1))
+                put("pageNo", pageNo)
                 put("index", 1)
                 put("channelId", channelId)
                 put("recSessionId", newRecSessionId())
             }
-            records = channelRecords(post("he001/theater", theaterBody)) ?: JSONArray()
+        }
+
+        val firstPath = if (isPopularFeed) "he001/recommendBook" else "he001/theater"
+        var records = channelRecords(post(firstPath, firstBody)) ?: JSONArray()
+
+        // Retain a theater fallback for the popular feed if recommendations
+        // are unavailable, without changing the requests for other channels.
+        if (isPopularFeed && records.length() == 0) {
+            val fallbackBody = JSONObject().apply {
+                put("newChannelStyle", 1)
+                put("isNeedRank", 1)
+                put("pageNo", pageNo)
+                put("index", 1)
+                put("channelId", channelId)
+                put("recSessionId", newRecSessionId())
+            }
+            records = channelRecords(post("he001/theater", fallbackBody)) ?: JSONArray()
         }
 
         val results = ArrayList<SearchResponse>()
