@@ -4,7 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
+import java.security.SecureRandom
 
 class DramaBox : MainAPI() {
     override var mainUrl = "https://www.dramabox.com"
@@ -59,8 +59,14 @@ class DramaBox : MainAPI() {
     }
 
     private fun image(obj: JSONObject?): String? =
-        text(obj, "bookCover", "cover", "coverUrl", "cover_url", "coverImage", "image")
+        text(obj, "coverWap", "bookCover", "cover", "coverUrl", "cover_url", "coverImage", "image")
             .takeIf { it.startsWith("http", true) }
+
+    private fun newRecSessionId(): String {
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
 
     private fun bookIdFromUrl(url: String): String? =
         Regex("(?:dramabox://|bookId=)([0-9]+)", RegexOption.IGNORE_CASE)
@@ -135,9 +141,7 @@ class DramaBox : MainAPI() {
                 put("isNeedRank", 1)
                 put("isNeedNewChannel", 1)
                 put("type", 0)
-                put("index", 0)
-                put("channelId", channelId)
-                put("recSessionId", UUID.randomUUID().toString().replace("-", ""))
+                put("recSessionId", newRecSessionId())
             }
         } else {
             JSONObject().apply {
@@ -146,7 +150,7 @@ class DramaBox : MainAPI() {
                 put("pageNo", page.coerceAtLeast(1))
                 put("index", 1)
                 put("channelId", channelId)
-                put("recSessionId", UUID.randomUUID().toString().replace("-", ""))
+                put("recSessionId", newRecSessionId())
             }
         }
         val root = post("he001/theater", body)
@@ -211,7 +215,7 @@ class DramaBox : MainAPI() {
             put("rid", "")
             put("enterReaderChapterIndex", 0)
             put("loadDirection", 0)
-            put("startUpKey", UUID.randomUUID().toString())
+            put("startUpKey", newRecSessionId())
             put("bookId", bookId)
             put("currencyPlaySource", "discover_167_rec")
             put("needEndRecommend", 0)
