@@ -109,8 +109,16 @@ class CimaClub : MainAPI() {
             ?: document.title().substringBefore("|").trim()
         if (title.isBlank()) return null
 
-        val poster = document.selectFirst(".MainSingle .image img")?.let { imageOf(it.parent() ?: it) }
-            ?: document.selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }
+        val posterImage: Element? = document.selectFirst(".MainSingle .image img")
+        val imagePoster: String? = posterImage?.let { image ->
+            val raw = image.attr("data-src")
+                .ifBlank { image.attr("data-original") }
+                .ifBlank { image.attr("src") }
+            raw.takeIf { it.isNotBlank() && !it.startsWith("data:") }?.let(::resolveUrl)
+        }
+        val poster: String? = imagePoster
+            ?: document.selectFirst("meta[property=og:image]")?.attr("content")
+                ?.takeIf { it.isNotBlank() }?.let(::resolveUrl)
         val plot = document.selectFirst(".StoryArea")?.text()?.trim()
             ?.ifBlank { null }
             ?: document.selectFirst("meta[name=description]")?.attr("content")
