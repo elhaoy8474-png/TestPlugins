@@ -135,16 +135,23 @@ class DramaBox : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val channelId = request.data.toIntOrNull() ?: 167
-        val body = if (channelId == 167) {
-            JSONObject().apply {
-                put("homePageStyle", 0)
-                put("isNeedRank", 1)
-                put("isNeedNewChannel", 1)
-                put("type", 0)
-                put("recSessionId", newRecSessionId())
-            }
-        } else {
-            JSONObject().apply {
+
+        // The official Android client loads the recommendation feed from
+        // he001/recommendBook, not from the guessed theater payload.
+        // Captured request shape: isNeedRank, specialColumnId, pageNo, recSessionId.
+        val recommendationBody = JSONObject().apply {
+            put("isNeedRank", 1)
+            put("specialColumnId", if (channelId == 167) 0 else channelId)
+            put("pageNo", page.coerceAtLeast(1))
+            put("recSessionId", newRecSessionId())
+        }
+        var records = channelRecords(post("he001/recommendBook", recommendationBody))
+            ?: JSONArray()
+
+        // Keep the other known channel endpoint as a fallback for channel
+        // pages that are not represented by the recommendation feed.
+        if (records.length() == 0) {
+            val theaterBody = JSONObject().apply {
                 put("newChannelStyle", 1)
                 put("isNeedRank", 1)
                 put("pageNo", page.coerceAtLeast(1))
@@ -152,9 +159,9 @@ class DramaBox : MainAPI() {
                 put("channelId", channelId)
                 put("recSessionId", newRecSessionId())
             }
+            records = channelRecords(post("he001/theater", theaterBody)) ?: JSONArray()
         }
-        val root = post("he001/theater", body)
-        val records = channelRecords(root) ?: JSONArray()
+
         val results = ArrayList<SearchResponse>()
         for (i in 0 until records.length()) {
             val item = records.optJSONObject(i) ?: continue
