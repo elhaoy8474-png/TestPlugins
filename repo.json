@@ -1,6 +1,6 @@
 {
-  "name": "AhwakTV Repository",
-  "description": "مستودع إضافة أهواك تي في لـ Cloudstream",
+  "name": "TestPlugins Repository",
+  "description": "مستودع إضافات Cloudstream: AhwakTV وQFilm وViu وCimaClub وXHamster",
   "manifestVersion": 1,
   "pluginLists": [
     "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/plugins.json"
