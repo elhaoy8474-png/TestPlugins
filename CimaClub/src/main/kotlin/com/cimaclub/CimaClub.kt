@@ -23,11 +23,12 @@ class CimaClub : MainAPI() {
     override val mainPage = mainPageOf(
         "$mainUrl/" to "المضاف حديثاً",
         "$mainUrl/category/افلام-اجنبي/" to "أفلام أجنبي",
-        "$mainUrl/category/افلام-عربي/" to "أفلام عربي",
         "$mainUrl/category/مسلسلات-اجنبي/" to "مسلسلات أجنبي",
-        "$mainUrl/category/مسلسلات-تركية/" to "مسلسلات تركية",
         "$mainUrl/category/مسلسلات-اسيوية/" to "مسلسلات آسيوية",
-        "$mainUrl/category/مسلسلات-انمي/" to "أنمي",
+        "$mainUrl/category/مسلسلات-تركية/" to "مسلسلات تركية",
+        "$mainUrl/category/افلام-كرتون/" to "أفلام كرتون",
+        "$mainUrl/category/مسلسلات-انمي/" to "مسلسلات أنمي",
+        "$mainUrl/category/مسلسلات-كرتون/" to "مسلسلات كرتون",
         "$mainUrl/category/برامج-تلفزيونية/" to "برامج تلفزيونية"
     )
 
@@ -89,7 +90,13 @@ class CimaClub : MainAPI() {
     }
 
     private fun episodeNumber(value: String): Int? {
-        val raw = Regex("[0-9٠-٩]+").find(value)?.value ?: return null
+        // Do not treat release years (for example 2026) as episode numbers.
+        // CimaClub labels episodes explicitly in Arabic or English.
+        val match = Regex(
+            """(?:الحلقة|حلقة|episode|ep\\.?)\\s*[-:#]?\\s*([0-9٠-٩]+)|S\\d{1,2}E(\\d+)""",
+            RegexOption.IGNORE_CASE
+        ).find(value) ?: return null
+        val raw = match.groupValues.drop(1).firstOrNull { it.isNotBlank() } ?: return null
         val normalized = raw.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }.joinToString("")
         return normalized.toIntOrNull()
     }
