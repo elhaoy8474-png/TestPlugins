@@ -46,7 +46,8 @@ class DramaBox : MainAPI() {
         "167" to "الرائجة",
         "85" to "الأحدث",
         "98" to "الأعلى ترتيبًا",
-        "152" to "التصنيفات"
+        "152" to "التصنيفات",
+        "999" to "تشخيص الاتصال"
     )
 
     private fun text(obj: JSONObject?, vararg keys: String): String {
@@ -174,9 +175,81 @@ class DramaBox : MainAPI() {
             ?: data.optJSONArray("bookList")
     }
 
+    private fun diagnosticItem(label: String, key: String): SearchResponse =
+        newTvSeriesSearchResponse(label, "dramabox-debug://$key", TvType.TvSeries)
+
+    /*
+     * A user-visible diagnostic feed. It deliberately uses no captured session
+     * credentials; it reports the transport/API boundary so the failure is
+     * observable without Logcat and without exposing tokens or response bodies.
+     */
+    private suspend fun diagnosticPage(request: MainPageRequest): HomePageResponse {
+        val items = ArrayList<SearchResponse>()
+        val body = JSONObject().apply {
+            put("isNeedRank", 1)
+            put("specialColumnId", 0)
+            put("pageNo", 1)
+            put("recSessionId", newRecSessionId())
+        }
+
+        try {
+            val response = app.post(
+                "$api/he001/recommendBook",
+                headers = apiHeaders,
+                json = body
+            )
+            val responseText = response.text
+            items.add(diagnosticItem("HTTP: ${response.code}", "http"))
+
+            val root = try {
+                JSONObject(responseText)
+            } catch (_: Exception) {
+                items.add(diagnosticItem(
+                    "JSON: غير صالح • bytes=${responseText.length}",
+                    "json-invalid"
+                ))
+                return newHomePageResponse(request.name, items)
+            }
+
+            val apiStatus = root.optInt("status", -1)
+            items.add(diagnosticItem("API status: $apiStatus", "api-status-$apiStatus"))
+
+            val rootKeys = root.keys().asSequence().toList().sorted()
+            items.add(diagnosticItem(
+                "JSON keys: ${rootKeys.joinToString(",").take(120)}",
+                "json-keys"
+            ))
+
+            val records = channelRecords(root) ?: JSONArray()
+            val parsed = ArrayList<SearchResponse>()
+            for (i in 0 until records.length()) {
+                val row = records.optJSONObject(i) ?: continue
+                searchResponse(row)?.let(parsed::add)
+            }
+
+            items.add(diagnosticItem("Records: ${records.length()}", "records"))
+            items.add(diagnosticItem("Parsed books: ${parsed.size}", "parsed"))
+            items.addAll(parsed.distinctBy { it.url })
+        } catch (error: Exception) {
+            val cause = error.cause?.javaClass?.simpleName
+            val detail = if (cause.isNullOrBlank()) {
+                error.javaClass.simpleName
+            } else {
+                "${error.javaClass.simpleName} → $cause"
+            }
+            items.add(diagnosticItem("Transport error: $detail", "transport-error"))
+        }
+
+        return newHomePageResponse(request.name, items)
+    }
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val channelId = request.data.toIntOrNull() ?: 167
         val pageNo = page.coerceAtLeast(1)
+
+        if (channelId == 999) {
+            return diagnosticPage(request)
+        }
 
         // recommendBook is verified for the general/popular feed only.
         // Do not pass other channel IDs as specialColumnId: that parameter
