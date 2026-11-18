@@ -43,8 +43,10 @@ class DramaBox : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "175" to "الرائجة",
-        "43" to "الأحدث"
+        "167" to "الرائجة",
+        "85" to "الأحدث",
+        "98" to "الأعلى ترتيبًا",
+        "152" to "التصنيفات"
     )
 
     private fun text(obj: JSONObject?, vararg keys: String): String {
@@ -105,20 +107,41 @@ class DramaBox : MainAPI() {
             }
             if (flattened.length() > 0) return flattened
         }
+
+        // The recommendation feed may be returned separately from the columns.
+        data.optJSONObject("recommendList")?.optJSONArray("records")?.let {
+            if (it.length() > 0) return it
+        }
+
+        // Ranking/category responses can wrap books in tag cards.
+        val recommendations = data.optJSONObject("recommendList")
+        val ranked = JSONArray()
+        val recommendationRows = recommendations?.optJSONArray("records")
+        if (recommendationRows != null) {
+            for (i in 0 until recommendationRows.length()) {
+                val row = recommendationRows.optJSONObject(i) ?: continue
+                val books = row.optJSONObject("tagCardVo")?.optJSONArray("tagBooks")
+                if (books != null) {
+                    for (j in 0 until books.length()) books.optJSONObject(j)?.let(ranked::put)
+                } else ranked.put(row)
+            }
+        }
+        if (ranked.length() > 0) return ranked
+
         return data.optJSONArray("records")
             ?: data.optJSONArray("bookList")
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val channelId = request.data.toIntOrNull() ?: 155
-        val body = if (channelId == 175) {
+        val channelId = request.data.toIntOrNull() ?: 167
+        val body = if (channelId == 167) {
             JSONObject().apply {
                 put("homePageStyle", 0)
                 put("isNeedRank", 1)
                 put("isNeedNewChannel", 1)
                 put("type", 0)
                 put("index", 0)
-                put("channelId", 175)
+                put("channelId", channelId)
                 put("recSessionId", UUID.randomUUID().toString().replace("-", ""))
             }
         } else {
@@ -127,7 +150,7 @@ class DramaBox : MainAPI() {
                 put("isNeedRank", 1)
                 put("pageNo", page.coerceAtLeast(1))
                 put("index", 1)
-                put("channelId", 43)
+                put("channelId", channelId)
                 put("recSessionId", UUID.randomUUID().toString().replace("-", ""))
             }
         }
@@ -156,7 +179,10 @@ class DramaBox : MainAPI() {
         }
         val root = post("search/search", body)
         val data = root?.optJSONObject("data") ?: return emptyList()
-        val suggestions = data.optJSONArray("searchList")
+        val suggestions = data.optJSONArray("searchResultList")
+            ?: data.optJSONArray("records")
+            ?: data.optJSONArray("list")
+            ?: data.optJSONArray("searchList")
             ?: data.optJSONArray("suggestList")
             ?: data.optJSONArray("bookList")
             ?: return emptyList()
@@ -166,7 +192,17 @@ class DramaBox : MainAPI() {
             val item = suggestions.optJSONObject(i) ?: continue
             val kind = text(item, "kind", "type", "suggestType")
             if (kind.equals("actor", true) || kind.equals("performer", true)) continue
-            searchResponse(item)?.let(results::add)
+
+            // Search results may wrap the actual book object or group books under a card.
+            val nestedBooks = item.optJSONArray("bookList")
+                ?: item.optJSONObject("tagCardVo")?.optJSONArray("tagBooks")
+            if (nestedBooks != null) {
+                for (j in 0 until nestedBooks.length()) {
+                    nestedBooks.optJSONObject(j)?.let { searchResponse(it)?.let(results::add) }
+                }
+            } else {
+                searchResponse(item)?.let(results::add)
+            }
         }
         return results.distinctBy { it.url }
     }
