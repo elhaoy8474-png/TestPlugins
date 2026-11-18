@@ -23,7 +23,7 @@ class DramaBox(private val appContext: Context) : MainAPI() {
      * volatile and user-specific, so this provider never stores or replays them.
      */
     private val baseApiHeaders = mapOf(
-        "User-Agent" to "okhttp/4.12.0",
+        "User-Agent" to "okhttp/5.5.1",
         "Accept" to "application/json",
         "Accept-Encoding" to "gzip",
         "Content-Type" to "application/json; charset=UTF-8",
@@ -200,6 +200,10 @@ class DramaBox(private val appContext: Context) : MainAPI() {
      */
     private suspend fun diagnosticPage(request: MainPageRequest): HomePageResponse {
         val items = ArrayList<SearchResponse>()
+        val configuredAuthParts = listOf("tn", "sn", "st").count { key ->
+            !authPrefs.getString(key, null).isNullOrBlank()
+        }
+        items.add(diagnosticItem("بيانات الجلسة المحلية: $configuredAuthParts/3", "auth-$configuredAuthParts"))
         val body = JSONObject().apply {
             put("isNeedRank", 1)
             put("specialColumnId", 0)
@@ -404,10 +408,19 @@ class DramaBox(private val appContext: Context) : MainAPI() {
 
         if (chapterRows.length() == 0 && batchData == null) return null
 
-        val title = text(batchData, "bookName", "title").ifBlank { "DramaBox - $bookId" }
-        val poster = text(batchData, "bookCover").takeIf { it.startsWith("http") }
+        val detailBook = detailData?.optJSONObject("bookInfo")
+            ?: detailData?.optJSONObject("book")
+            ?: detailData
+        val title = text(batchData, "bookName", "title")
+            .ifBlank { text(detailBook, "bookName", "bookTitle", "title", "name") }
+            .ifBlank { "DramaBox - $bookId" }
+        val poster = text(batchData, "bookCover", "coverWap", "coverUrl")
+            .ifBlank { text(detailBook, "coverWap", "bookCover", "coverUrl", "coverImage") }
+            .takeIf { it.startsWith("http", true) }
         val plot = text(batchData, "introduction", "description", "synopsis")
-        val count = batchData?.optInt("chapterCount", chapterRows.length())
+            .ifBlank { text(detailBook, "introduction", "description", "synopsis") }
+        val count = batchData?.optInt("chapterCount", 0)?.takeIf { it > 0 }
+            ?: detailBook?.optInt("chapterCount", 0)?.takeIf { it > 0 }
             ?: chapterRows.length()
 
         val episodes = ArrayList<Episode>()
@@ -416,12 +429,25 @@ class DramaBox(private val appContext: Context) : MainAPI() {
             val chapterId = text(chapter, "chapterId", "chapter_id")
             if (chapterId.isBlank()) continue
             val chapterIndex = chapter.optInt("chapterIndex", i)
-            val isCharge = chapter.optInt("isCharge", 0) == 1
+            // In the verified detail response, isCharge and isPay both mark paid chapters.
+            val isCharge = chapter.optInt("isCharge", 0) == 1 ||
+                chapter.optInt("isPay", 0) == 1
+            val availableQualities = chapter.optJSONArray("chapterSizeVoList")
+            val qualityLabels = ArrayList<String>()
+            if (availableQualities != null) {
+                for (q in 0 until availableQualities.length()) {
+                    val quality = availableQualities.optJSONObject(q)?.optInt("quality", 0) ?: 0
+                    if (quality > 0 && !qualityLabels.contains("${quality}p")) {
+                        qualityLabels.add("${quality}p")
+                    }
+                }
+            }
             val episodeData = JSONObject().apply {
                 put("bookId", bookId)
                 put("chapterId", chapterId)
                 put("index", chapterIndex)
                 put("isCharge", isCharge)
+                put("isPay", chapter.optInt("isPay", 0) == 1)
             }.toString()
             val number = chapterIndex + 1
             episodes.add(newEpisode(episodeData) {
@@ -430,7 +456,11 @@ class DramaBox(private val appContext: Context) : MainAPI() {
                 episode = number
                 season = 1
                 posterUrl = poster
-                description = if (isCharge) "حلقة مدفوعة - افتحها من التطبيق الرسمي" else "متاحة"
+                description = if (isCharge) {
+                    "حلقة مدفوعة - افتحها من التطبيق الرسمي"
+                } else {
+                    "متاحة" + if (qualityLabels.isNotEmpty()) " • الجودات: ${qualityLabels.joinToString("، ")}" else ""
+                }
             })
         }
 
@@ -454,7 +484,7 @@ class DramaBox(private val appContext: Context) : MainAPI() {
         if (bookId.isBlank() || chapterId.isBlank()) return false
 
         // Do not attempt to resolve chapters marked as paid by the detail API.
-        if (episode.optBoolean("isCharge", false)) return false
+        if (episode.optBoolean("isCharge", false) || episode.optBoolean("isPay", false)) return false
 
         val root = batchLoad(bookId, index, false) ?: return false
         val dataObject = root.optJSONObject("data") ?: return false
@@ -469,7 +499,8 @@ class DramaBox(private val appContext: Context) : MainAPI() {
         }
         val chapter = selected ?: return false
         if (chapter.optBoolean("chargeChapter", false) ||
-            chapter.optInt("isCharge", 0) == 1
+            chapter.optInt("isCharge", 0) == 1 ||
+            chapter.optInt("isPay", 0) == 1
         ) return false
 
         val cdns = chapter.optJSONArray("cdnList") ?: return false
