@@ -22,11 +22,32 @@ class CimaClub : MainAPI() {
 
     override val mainPage = mainPageOf(
         "$mainUrl/" to "المضاف حديثاً",
-        "$mainUrl/category/افلام-اجنبي/" to "أفلام أجنبي",
-        "$mainUrl/category/مسلسلات-اجنبي/" to "مسلسلات أجنبي",
+
+        // Movies by language / origin
+        "$mainUrl/category/افلام-عربي/" to "أفلام عربية",
+        "$mainUrl/category/افلام-اسيوي/" to "أفلام آسيوية",
+        "$mainUrl/category/افلام-اجنبي/" to "أفلام أجنبية",
+        "$mainUrl/category/افلام-تركية/" to "أفلام تركية",
+        "$mainUrl/category/افلام-هندية/" to "أفلام هندية",
+        "$mainUrl/category/افلام-يابانية/" to "أفلام يابانية",
+
+        // Movies by dubbing / animation
+        "$mainUrl/category/افلام-اجنبية-مدبلجة/" to "أفلام أجنبية مدبلجة",
+        "$mainUrl/category/افلام-مدبلجة/" to "كل الأفلام المدبلجة",
+        "$mainUrl/category/افلام-انمي/" to "أفلام أنمي",
+        "$mainUrl/category/افلام-كرتون/" to "أفلام كرتون",
+
+        // Series by language / origin
+        "$mainUrl/category/مسلسلات-عربي/" to "مسلسلات عربية",
+        "$mainUrl/category/مسلسلات-اجنبي/" to "مسلسلات أجنبية",
         "$mainUrl/category/مسلسلات-اسيوية/" to "مسلسلات آسيوية",
         "$mainUrl/category/مسلسلات-تركية/" to "مسلسلات تركية",
-        "$mainUrl/category/افلام-كرتون/" to "أفلام كرتون",
+        "$mainUrl/category/مسلسلات-هندية/" to "مسلسلات هندية",
+
+        // Series by dubbing / subtitles / animation
+        "$mainUrl/category/مسلسلات-اسيوية-مدبلجة/" to "مسلسلات آسيوية مدبلجة",
+        "$mainUrl/category/مسلسلات-تركية-مترجمة/" to "مسلسلات تركية مترجمة",
+        "$mainUrl/category/مسلسلات-تركية-مدبلجة/" to "مسلسلات تركية مدبلجة",
         "$mainUrl/category/مسلسلات-انمي/" to "مسلسلات أنمي",
         "$mainUrl/category/مسلسلات-كرتون/" to "مسلسلات كرتون",
         "$mainUrl/category/برامج-تلفزيونية/" to "برامج تلفزيونية"
