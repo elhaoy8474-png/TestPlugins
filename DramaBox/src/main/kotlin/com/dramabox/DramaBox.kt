@@ -89,15 +89,49 @@ class DramaBox : MainAPI() {
     private suspend fun post(path: String, body: JSONObject): JSONObject? {
         return try {
             val response = app.post("$api/$path", headers = apiHeaders, json = body)
-            JSONObject(response.text).also { result ->
-                val apiStatus = result.optInt("status", 0)
-                if (apiStatus != 0) {
-                    android.util.Log.w("DramaBox", "API status $apiStatus for $path")
-                }
+            val responseText = response.text
+            val httpCode = response.code
+
+            // Log transport metadata only. Never log headers, body contents, tokens,
+            // signatures, device identifiers, or user identifiers.
+            android.util.Log.i(
+                "DramaBox",
+                "POST $path HTTP=$httpCode length=${responseText.length}"
+            )
+
+            val result = try {
+                JSONObject(responseText)
+            } catch (parseError: Exception) {
+                android.util.Log.w(
+                    "DramaBox",
+                    "Invalid JSON for $path (HTTP=$httpCode, ${parseError.javaClass.simpleName})"
+                )
+                return null
             }
+
+            val apiStatus = result.optInt("status", -1)
+            val rootKeys = result.keys().asSequence().toList().sorted().joinToString(",")
+            val dataKeys = result.optJSONObject("data")
+                ?.keys()?.asSequence()?.toList()?.sorted()?.joinToString(",")
+                ?: "none"
+
+            android.util.Log.i(
+                "DramaBox",
+                "API $path status=$apiStatus rootKeys=$rootKeys dataKeys=$dataKeys"
+            )
+
+            if (httpCode !in 200..299) {
+                android.util.Log.w("DramaBox", "Non-2xx response for $path: HTTP=$httpCode")
+            }
+            if (apiStatus != 0) {
+                android.util.Log.w("DramaBox", "API status=$apiStatus for $path")
+            }
+            result
         } catch (error: Exception) {
-            // Never log request headers or tokens; only the endpoint and exception type.
-            android.util.Log.w("DramaBox", "Request failed for $path (${error.javaClass.simpleName})")
+            android.util.Log.w(
+                "DramaBox",
+                "Request failed for $path (${error.javaClass.simpleName})"
+            )
             null
         }
     }
@@ -188,6 +222,10 @@ class DramaBox : MainAPI() {
             val item = records.optJSONObject(i) ?: continue
             searchResponse(item)?.let(results::add)
         }
+        android.util.Log.i(
+            "DramaBox",
+            "HOME channel=$channelId page=$pageNo records=${records.length()} results=${results.distinctBy { it.url }.size}"
+        )
         return newHomePageResponse(request.name, results.distinctBy { it.url })
     }
 
