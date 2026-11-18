@@ -43,10 +43,10 @@
     },
     {
         "iconUrl": "https://www.dramabox.com/favicon.ico",
-        "fileHash": "sha256-aa51f480d2a8539edba32c9bab5f7ff27dd8fecb02bfccaaa57a61f3bcba62f3",
+        "fileHash": "sha256-973f60065965548a4207ef24cac0c0b983c2a6429c3324ef5c6e3e7d527608b5",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 21276,
+        "fileSize": 22113,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -55,7 +55,7 @@
         "tvTypes": [
             "TvSeries"
         ],
-        "version": 2,
+        "version": 3,
         "internalName": "DramaBox",
         "description": "DramaBox - \u0645\u0633\u0644\u0633\u0644\u0627\u062a \u0642\u0635\u064a\u0631\u0629 \u0645\u062f\u0628\u0644\u062c\u0629 \u0648\u0645\u062a\u0631\u062c\u0645\u0629",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/DramaBox.cs3",
