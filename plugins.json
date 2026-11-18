@@ -43,10 +43,10 @@
     },
     {
         "iconUrl": "https://www.dramabox.com/favicon.ico",
-        "fileHash": "sha256-c225fc61c35041a3fa6aa68199141233937b72eb5ed14b9df85bdfb463ff5e6b",
+        "fileHash": "sha256-fc63aade70edefd2cbeed509d4339a552bae3c0a8c035a52a3e36c02b857073d",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 19908,
+        "fileSize": 20382,
         "status": 3,
         "language": "ar",
         "authors": [
