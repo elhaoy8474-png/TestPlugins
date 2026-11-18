@@ -108,12 +108,7 @@ class DramaBox : MainAPI() {
             if (flattened.length() > 0) return flattened
         }
 
-        // The recommendation feed may be returned separately from the columns.
-        data.optJSONObject("recommendList")?.optJSONArray("records")?.let {
-            if (it.length() > 0) return it
-        }
-
-        // Ranking/category responses can wrap books in tag cards.
+        // Recommendation and ranking responses can wrap books in tag cards.
         val recommendations = data.optJSONObject("recommendList")
         val ranked = JSONArray()
         val recommendationRows = recommendations?.optJSONArray("records")
