@@ -51,7 +51,7 @@ class XHamster : MainAPI() {
         val href = attr("href").trim()
         if (href.isBlank() || !href.contains("/videos/")) return null
 
-        val image = selectFirst("img")
+        val image: Element? = selectFirst("img")
         val title = firstNonBlank(
             attr("aria-label"),
             image?.attr("alt").orEmpty(),
@@ -60,7 +60,7 @@ class XHamster : MainAPI() {
             text()
         ) ?: return null
 
-        val poster = image?.let {
+        val poster: String? = image?.let {
             firstNonBlank(
                 it.attr("data-src"),
                 it.attr("data-original"),
@@ -526,6 +526,11 @@ class XHamster : MainAPI() {
                         type = stream.type
                     ) {
                         referer = pageUrl
+                        headers = mapOf(
+                            "User-Agent" to userAgent,
+                            "Origin" to mainUrl,
+                            "Referer" to pageUrl
+                        )
                         quality = stream.quality
                     }
                 )
