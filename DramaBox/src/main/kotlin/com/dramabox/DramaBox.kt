@@ -37,15 +37,14 @@ class DramaBox : MainAPI() {
         "language" to "ar",
         "current-language" to "ar",
         "locale" to "ar_EG",
-        "country-code" to "EG",
+        "country-code" to "US",
         "time-zone" to "+0200",
         "tz" to "-120"
     )
 
     override val mainPage = mainPageOf(
-        "155" to "الرائجة",
-        "41" to "الأحدث",
-        "89" to "التصنيفات والترتيب"
+        "175" to "الرائجة",
+        "43" to "الأحدث"
     )
 
     private fun text(obj: JSONObject?, vararg keys: String): String {
@@ -92,19 +91,45 @@ class DramaBox : MainAPI() {
         val data = root?.optJSONObject("data") ?: return null
         val theater = data.optJSONObject("newTheaterList")
             ?: data.optJSONObject("theaterList")
-        return theater?.optJSONArray("records")
-            ?: data.optJSONArray("records")
+        theater?.optJSONArray("records")?.let { if (it.length() > 0) return it }
+
+        // For You returns columns, each containing its own bookList.
+        val columns = data.optJSONArray("columnVoList")
+        if (columns != null) {
+            val flattened = JSONArray()
+            for (i in 0 until columns.length()) {
+                val books = columns.optJSONObject(i)?.optJSONArray("bookList") ?: continue
+                for (j in 0 until books.length()) {
+                    books.optJSONObject(j)?.let { flattened.put(it) }
+                }
+            }
+            if (flattened.length() > 0) return flattened
+        }
+        return data.optJSONArray("records")
             ?: data.optJSONArray("bookList")
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val channelId = request.data.toIntOrNull() ?: 155
-        val body = JSONObject().apply {
-            put("newChannelStyle", 1)
-            put("isNeedRank", 1)
-            put("pageNo", page.coerceAtLeast(1))
-            put("index", page.coerceAtLeast(1))
-            put("channelId", channelId)
+        val body = if (channelId == 175) {
+            JSONObject().apply {
+                put("homePageStyle", 0)
+                put("isNeedRank", 1)
+                put("isNeedNewChannel", 1)
+                put("type", 0)
+                put("index", 0)
+                put("channelId", 175)
+                put("recSessionId", UUID.randomUUID().toString().replace("-", ""))
+            }
+        } else {
+            JSONObject().apply {
+                put("newChannelStyle", 1)
+                put("isNeedRank", 1)
+                put("pageNo", page.coerceAtLeast(1))
+                put("index", 1)
+                put("channelId", 43)
+                put("recSessionId", UUID.randomUUID().toString().replace("-", ""))
+            }
         }
         val root = post("he001/theater", body)
         val records = channelRecords(root) ?: JSONArray()
@@ -120,11 +145,20 @@ class DramaBox : MainAPI() {
         val normalized = query.trim().take(80)
         if (normalized.isBlank()) return emptyList()
 
-        val root = post("search/suggest", JSONObject().put("keyword", normalized))
+        val body = JSONObject().apply {
+            put("searchSource", "")
+            put("sortType", 1)
+            put("synSwitch", 1)
+            put("pageNo", 1)
+            put("pageSize", 20)
+            put("from", "search_result")
+            put("keyword", normalized)
+        }
+        val root = post("search/search", body)
         val data = root?.optJSONObject("data") ?: return emptyList()
-        val suggestions = data.optJSONArray("suggestList")
+        val suggestions = data.optJSONArray("searchList")
+            ?: data.optJSONArray("suggestList")
             ?: data.optJSONArray("bookList")
-            ?: data.optJSONArray("searchList")
             ?: return emptyList()
 
         val results = ArrayList<SearchResponse>()
