@@ -1,12 +1,13 @@
 package com.dramabox
 
+import android.content.Context
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
 
-class DramaBox : MainAPI() {
+class DramaBox(private val appContext: Context) : MainAPI() {
     override var mainUrl = "https://www.dramabox.com"
     override var name = "DramaBox"
     override var lang = "ar"
@@ -21,7 +22,7 @@ class DramaBox : MainAPI() {
      * contains per-session bearer/signature headers (tn/sn/st); those values are
      * volatile and user-specific, so this provider never stores or replays them.
      */
-    private val apiHeaders = mapOf(
+    private val baseApiHeaders = mapOf(
         "User-Agent" to "okhttp/4.12.0",
         "Accept" to "application/json",
         "Accept-Encoding" to "gzip",
@@ -41,6 +42,20 @@ class DramaBox : MainAPI() {
         "time-zone" to "+0200",
         "tz" to "-120"
     )
+
+    // Per-user session values are stored only in CloudStream's private app storage.
+    private val authPrefs = appContext.getSharedPreferences("dramabox_auth_v1", Context.MODE_PRIVATE)
+
+    private fun requestHeaders(): Map<String, String> {
+        val headers = baseApiHeaders.toMutableMap()
+        listOf("tn", "sn", "st", "device-id").forEach { key ->
+            authPrefs.getString(key, null)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { headers[key] = it }
+        }
+        return headers
+    }
 
     override val mainPage = mainPageOf(
         "167" to "الرائجة",
@@ -89,7 +104,7 @@ class DramaBox : MainAPI() {
 
     private suspend fun post(path: String, body: JSONObject): JSONObject? {
         return try {
-            val response = app.post("$api/$path", headers = apiHeaders, json = body)
+            val response = app.post("$api/$path", headers = requestHeaders(), json = body)
             val responseText = response.text
             val httpCode = response.code
 
@@ -188,14 +203,17 @@ class DramaBox : MainAPI() {
         val body = JSONObject().apply {
             put("isNeedRank", 1)
             put("specialColumnId", 0)
-            put("pageNo", 1)
-            put("recSessionId", newRecSessionId())
+            // The supplied captured request used pageNo=4. Reuse its recSessionId
+            // when configured locally so the test matches the captured request shape.
+            put("pageNo", 4)
+            val capturedRecSession = authPrefs.getString("recSessionId", null)?.trim().orEmpty()
+            put("recSessionId", capturedRecSession.ifBlank { newRecSessionId() })
         }
 
         try {
             val response = app.post(
                 "$api/he001/recommendBook",
-                headers = apiHeaders,
+                headers = requestHeaders(),
                 json = body
             )
             val responseText = response.text
