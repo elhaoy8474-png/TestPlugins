@@ -22,6 +22,9 @@ class CimaClub : MainAPI() {
 
     override val mainPage = mainPageOf(
         "$mainUrl/" to "المضاف حديثاً",
+        "$mainUrl/?cimaclub_sort=views" to "الأكثر مشاهدة",
+        "$mainUrl/?cimaclub_sort=newMovies" to "جديد الأفلام",
+        "$mainUrl/?cimaclub_sort=imdbRating" to "الأعلى تقييماً",
 
         // Movies by language / origin
         "$mainUrl/category/افلام-عربي/" to "أفلام عربية",
@@ -95,12 +98,32 @@ class CimaClub : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val base = request.data.trimEnd('/')
-        val url = if (page <= 1) request.data else {
-            if (base == mainUrl) "$mainUrl/page/$page/"
-            else "$base/page/$page/"
+        val sortType = when {
+            request.data.contains("cimaclub_sort=views") -> "views"
+            request.data.contains("cimaclub_sort=newMovies") -> "newMovies"
+            request.data.contains("cimaclub_sort=imdbRating") -> "imdbRating"
+            else -> null
         }
-        val html = app.get(url, headers = headers).text
+
+        val html = if (sortType != null) {
+            // These tabs use the site's own AJAX filtering endpoint.
+            // The request type values were verified against the live CimaClub page.
+            app.post(
+                "$mainUrl/wp-content/themes/cimaclub/Ajaxt/Filtering.php",
+                headers = headers + mapOf(
+                    "Content-Type" to "application/x-www-form-urlencoded",
+                    "X-Requested-With" to "XMLHttpRequest"
+                ),
+                data = mapOf("type" to sortType)
+            ).text
+        } else {
+            val base = request.data.substringBefore("?").trimEnd('/')
+            val url = if (page <= 1) request.data else {
+                if (base == mainUrl) "$mainUrl/page/$page/"
+                else "$base/page/$page/"
+            }
+            app.get(url, headers = headers).text
+        }
         return newHomePageResponse(request.name, extractResults(html))
     }
 
