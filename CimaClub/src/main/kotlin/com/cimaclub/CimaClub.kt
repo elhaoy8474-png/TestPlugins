@@ -93,7 +93,7 @@ class CimaClub : MainAPI() {
         // Do not treat release years (for example 2026) as episode numbers.
         // CimaClub labels episodes explicitly in Arabic or English.
         val match = Regex(
-            """(?:الحلقة|حلقة|episode|ep\\.?)\\s*[-:#]?\\s*([0-9٠-٩]+)|S\\d{1,2}E(\\d+)""",
+            """(?:الحلقة|حلقة|episode|ep\.?)\s*[-:#]?\s*([0-9٠-٩]+)|S\d{1,2}E(\d+)""",
             RegexOption.IGNORE_CASE
         ).find(value) ?: return null
         val raw = match.groupValues.drop(1).firstOrNull { it.isNotBlank() } ?: return null
