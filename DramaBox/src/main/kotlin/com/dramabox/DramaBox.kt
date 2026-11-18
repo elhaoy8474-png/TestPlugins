@@ -97,7 +97,7 @@ class DramaBox : MainAPI() {
             }
         } catch (error: Exception) {
             // Never log request headers or tokens; only the endpoint and exception type.
-            android.util.Log.w("DramaBox", "Request failed for $path (\${error.javaClass.simpleName})")
+            android.util.Log.w("DramaBox", "Request failed for $path (${error.javaClass.simpleName})")
             null
         }
     }
