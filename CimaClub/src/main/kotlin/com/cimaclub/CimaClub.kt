@@ -90,7 +90,7 @@ class CimaClub : MainAPI() {
             title.contains("season", true)
 
         return if (isSeries) {
-            newTvSeriesSearchResponse(seriesKey(title), url, TvType.TvSeries) {
+            newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
                 posterUrl = poster
             }
         } else {
@@ -224,7 +224,7 @@ class CimaClub : MainAPI() {
         // CimaClub places the real episode catalogue inside section.allepcont.
         // It can contain every season of a show (for example ER: 331 episodes / 15 seasons).
         val episodeElements = document.select("section.allepcont a[href]")
-        val hasSeasonLinks = document.select("section.otherser a[href*=/series/]").isNotEmpty()
+        val hasSeasonLinks = document.select("section.otherser a[href]").any { it.attr("href").contains("/series/") }
         val currentEpisode = episodeNumber(title)
         val currentSeason = seasonNumber(title) ?: 1
         val isSeriesPage = episodeElements.isNotEmpty() ||
