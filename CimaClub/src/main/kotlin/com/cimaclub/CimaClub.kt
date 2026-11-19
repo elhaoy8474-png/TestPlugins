@@ -225,7 +225,7 @@ class CimaClub : MainAPI() {
         var cleaned = title
         cleaned = cleaned.replace(
             Regex(
-                """\s*(?:الحلقة|حلقة|episode|ep\.?)\s*[-:#]?\s*[0-9٠-٩]+.*$""",
+                """\s*(?:الحلقة|حلقة|episode|ep\.?)\s*[-:#]?(?:[0-9٠-٩]+)?(?:\s+.*)?$""",
                 RegexOption.IGNORE_CASE
             ),
             ""
