@@ -79,11 +79,20 @@ class CimaClub : MainAPI() {
             ?: anchor.attr("title").takeIf { it.isNotBlank() }
             ?: anchor.text().trim()
         if (title.isBlank()) return null
+
         val poster = imageOf(anchor)
         val url = resolveUrl(href)
-        val isEpisode = episodeNumber(title) != null || title.contains("الحلقة", true)
-        return if (isEpisode) {
-            newTvSeriesSearchResponse(title, url, TvType.TvSeries) { posterUrl = poster }
+        val isSeries = episodeNumber(title) != null ||
+            seasonNumber(title) != null ||
+            title.contains("الحلقة", true) ||
+            title.contains("حلقة", true) ||
+            title.contains("episode", true) ||
+            title.contains("season", true)
+
+        return if (isSeries) {
+            newTvSeriesSearchResponse(seriesKey(title), url, TvType.TvSeries) {
+                posterUrl = poster
+            }
         } else {
             newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
         }
@@ -92,21 +101,15 @@ class CimaClub : MainAPI() {
     private fun extractResults(html: String): List<SearchResponse> {
         val document = Jsoup.parse(html, mainUrl)
         val unique = LinkedHashMap<String, SearchResponse>()
-        val episodeRanks = HashMap<String, Int>()
+        val seriesRanks = HashMap<String, Int>()
 
         document.select(
             ".Small--Box a.recent--block[href], a.recent--block[href], .BlocksHolder a[href]"
         ).forEach { element ->
             val result = element.toSearchResult() ?: return@forEach
-            val episode = episodeNumber(result.name)
-            val isSeries = result.type == TvType.TvSeries ||
-                episode != null ||
-                result.name.contains("الحلقة", ignoreCase = true) ||
-                result.name.contains("حلقة", ignoreCase = true)
-
+            val isSeries = result.type == TvType.TvSeries
             if (isSeries) {
-                // CimaClub publishes each episode as a separate card.
-                // Collapse them into one series card and keep the newest episode.
+                // Group every season and every episode under one parent show.
                 val cleanTitle = seriesKey(result.name)
                 val identity = cleanTitle.lowercase()
                     .replace(Regex("""[\p{P}\p{S}\s]+"""), " ")
@@ -114,8 +117,9 @@ class CimaClub : MainAPI() {
                 if (identity.isBlank()) return@forEach
 
                 val key = "series:$identity"
-                val rank = episode ?: Int.MIN_VALUE
-                val currentRank = episodeRanks[key] ?: Int.MIN_VALUE
+                val rank = (seasonNumber(result.name) ?: 1) * 1000 +
+                    (episodeNumber(result.name) ?: 0)
+                val currentRank = seriesRanks[key] ?: Int.MIN_VALUE
 
                 if (!unique.containsKey(key) || rank > currentRank) {
                     unique[key] = newTvSeriesSearchResponse(
@@ -125,7 +129,7 @@ class CimaClub : MainAPI() {
                     ) {
                         posterUrl = result.posterUrl
                     }
-                    episodeRanks[key] = rank
+                    seriesRanks[key] = rank
                 }
             } else {
                 val identity = resolveUrl(result.url)
@@ -136,8 +140,7 @@ class CimaClub : MainAPI() {
             }
         }
 
-        // LinkedHashMap keeps the source's section order while replacing a series
-        // card with its most recent episode when a later duplicate is encountered.
+        // Keep the first position for each show, while using its newest season/episode link.
         return unique.values.toList()
     }
 
@@ -177,30 +180,26 @@ class CimaClub : MainAPI() {
         return extractResults(html)
     }
 
+    private fun normalizeDigits(value: String): String = value.map {
+        if (it in '٠'..'٩') ('0' + (it - '٠')) else it
+    }.joinToString("")
+
     private fun episodeNumber(value: String): Int? {
-        // Do not treat release years (for example 2026) as episode numbers.
-        // CimaClub labels episodes explicitly in Arabic or English.
         val match = Regex(
             """(?:الحلقة|حلقة|episode|ep\.?)\s*[-:#]?\s*([0-9٠-٩]+)|S\d{1,2}E(\d+)""",
             RegexOption.IGNORE_CASE
         ).find(value) ?: return null
         val raw = match.groupValues.drop(1).firstOrNull { it.isNotBlank() } ?: return null
-        val normalized = raw.map { if (it in '٠'..'٩') ('0' + (it - '٠')) else it }.joinToString("")
-        return normalized.toIntOrNull()
+        return normalizeDigits(raw).toIntOrNull()
     }
 
-    private fun seriesKey(title: String): String = title
-        .replace(
-            Regex("""\s*(?:الحلقة|حلقة|episode|ep\.?)\s*[-:#]?\s*[0-9٠-٩]+.*$""", RegexOption.IGNORE_CASE),
-            ""
-        )
-        .replace(Regex("""\s*S\d{1,2}\s*E\d+.*$""", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("""\s+"""), " ")
-        .trim()
-
-    override suspend fun load(url: String): LoadResponse? {
-        val html = app.get(url, headers = headers).text
-        val document = Jsoup.parse(html, url)
+    private fun seasonNumber(value: String): Int? {
+        val match = Regex(
+            """(?:الموسم|موسم|season|الجزء|جزء|part)\s*(?:رقم\s*)?([0-9٠-٩]+|الأول|الاول|الأولى|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|السادس|السادسة|السابع|السابعة|الثامن|الثامنة|التاسع|التاسعة|العاشر|العاشرة|الحادي\s+عشر|الحادية\s+عشرة|الثاني\s+عشر|الثانية\s+عشرة|الثالث\s+عشر|الثالثة\s+عشرة)""",
+            RegexOption.IGNORE    override suspend fun load(url: String): LoadResponse? {
+        val pageUrl = resolveUrl(url)
+        val html = app.get(pageUrl, headers = headers).text
+        val document = Jsoup.parse(html, pageUrl)
         val title = document.selectFirst("h1.PostTitle")?.text()?.trim()
             ?.ifBlank { null }
             ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
@@ -222,8 +221,79 @@ class CimaClub : MainAPI() {
             ?: document.selectFirst("meta[name=description]")?.attr("content")
         val category = document.select(".TaxContent a").firstOrNull()?.text()?.trim().orEmpty()
 
+        // CimaClub places the real episode catalogue inside section.allepcont.
+        // It can contain every season of a show (for example ER: 331 episodes / 15 seasons).
+        val episodeElements = document.select("section.allepcont a[href]")
+        val hasSeasonLinks = document.select("section.otherser a[href*=/series/]").isNotEmpty()
         val currentEpisode = episodeNumber(title)
-        if (currentEpisode != null || title.contains("الحلقة", true)) {
+        val currentSeason = seasonNumber(title) ?: 1
+        val isSeriesPage = episodeElements.isNotEmpty() ||
+            currentEpisode != null ||
+            seasonNumber(title) != null ||
+            hasSeasonLinks
+
+        if (isSeriesPage) {
+            val episodesByUrl = LinkedHashMap<String, Triple<Int, Int, Episode>>()
+
+            episodeElements.forEach { element ->
+                val href = element.attr("href").takeIf { it.isNotBlank() }
+                    ?.let(::resolveUrl) ?: return@forEach
+                val label = element.attr("title").ifBlank {
+                    element.selectFirst(".ep-info h2")?.text()?.trim()
+                        ?.ifBlank { null } ?: element.text().trim()
+                }
+                val number = episodeNumber(label)
+                    ?: episodeNumber(element.selectFirst(".epnum")?.text().orEmpty())
+                    ?: return@forEach
+                val season = seasonNumber(label) ?: currentSeason
+                val episodePoster = imageOf(element) ?: poster
+                val displayName = if (label.contains("الأخيرة", true) || label.contains("والأخيرة", true)) {
+                    "الحلقة $number - الأخيرة"
+                } else {
+                    "الحلقة $number"
+                }
+                val episode = newEpisode(href) {
+                    name = displayName
+                    episode = number
+                    season = season
+                    posterUrl = episodePoster
+                }
+                episodesByUrl.putIfAbsent(href, Triple(season, number, episode))
+            }
+
+            // A page may have an incomplete/empty AJAX-loaded catalogue; never lose its own episode.
+            if (episodesByUrl.isEmpty() && currentEpisode != null) {
+                val episode = newEpisode(pageUrl) {
+                    name = "الحلقة $currentEpisode"
+                    episode = currentEpisode
+                    season = currentSeason
+                    posterUrl = poster
+                }
+                episodesByUrl[pageUrl] = Triple(currentSeason, currentEpisode, episode)
+            }
+
+            val episodeItems = episodesByUrl.values
+                .sortedWith(compareBy<Triple<Int, Int, Episode>> { it.first }.thenBy { it.second })
+                .map { it.third }
+
+            if (episodeItems.isNotEmpty()) {
+                val seriesTitle = seriesKey(title).ifBlank { title }
+                return newTvSeriesLoadResponse(seriesTitle, pageUrl, TvType.TvSeries, episodeItems) {
+                    posterUrl = poster
+                    this.plot = plot
+                    tags = if (category.isBlank()) emptyList() else listOf(category)
+                }
+            }
+        }
+
+        return newMovieLoadResponse(title, pageUrl, TvType.Movie, pageUrl) {
+            posterUrl = poster
+            this.plot = plot
+            tags = if (category.isBlank()) emptyList() else listOf(category)
+        }
+    }
+
+{
             val key = seriesKey(title)
             val related = document.select(".BlocksHolder a.recent--block[href]")
                 .mapNotNull { element ->
