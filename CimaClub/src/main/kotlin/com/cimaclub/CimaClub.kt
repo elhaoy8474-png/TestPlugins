@@ -91,10 +91,54 @@ class CimaClub : MainAPI() {
 
     private fun extractResults(html: String): List<SearchResponse> {
         val document = Jsoup.parse(html, mainUrl)
-        return document.select(
+        val unique = LinkedHashMap<String, SearchResponse>()
+        val episodeRanks = HashMap<String, Int>()
+
+        document.select(
             ".Small--Box a.recent--block[href], a.recent--block[href], .BlocksHolder a[href]"
-        ).mapNotNull { it.toSearchResult() }
-            .distinctBy { it.url }
+        ).forEach { element ->
+            val result = element.toSearchResult() ?: return@forEach
+            val episode = episodeNumber(result.name)
+            val isSeries = result.type == TvType.TvSeries ||
+                episode != null ||
+                result.name.contains("الحلقة", ignoreCase = true) ||
+                result.name.contains("حلقة", ignoreCase = true)
+
+            if (isSeries) {
+                // CimaClub publishes each episode as a separate card.
+                // Collapse them into one series card and keep the newest episode.
+                val cleanTitle = seriesKey(result.name)
+                val identity = cleanTitle.lowercase()
+                    .replace(Regex("""[\p{P}\p{S}\s]+"""), " ")
+                    .trim()
+                if (identity.isBlank()) return@forEach
+
+                val key = "series:$identity"
+                val rank = episode ?: Int.MIN_VALUE
+                val currentRank = episodeRanks[key] ?: Int.MIN_VALUE
+
+                if (!unique.containsKey(key) || rank > currentRank) {
+                    unique[key] = newTvSeriesSearchResponse(
+                        cleanTitle,
+                        result.url,
+                        TvType.TvSeries
+                    ) {
+                        posterUrl = result.posterUrl
+                    }
+                    episodeRanks[key] = rank
+                }
+            } else {
+                val identity = resolveUrl(result.url)
+                    .substringBefore("?")
+                    .trimEnd('/')
+                    .lowercase()
+                unique.putIfAbsent("url:$identity", result)
+            }
+        }
+
+        // LinkedHashMap keeps the source's section order while replacing a series
+        // card with its most recent episode when a later duplicate is encountered.
+        return unique.values.toList()
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -146,9 +190,12 @@ class CimaClub : MainAPI() {
     }
 
     private fun seriesKey(title: String): String = title
-        .replace(Regex("\\s*الحلقة\\s*[0-9٠-٩]+.*$", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("\\s*حلقة\\s*[0-9٠-٩]+.*$", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("\\s+"), " ")
+        .replace(
+            Regex("""\s*(?:الحلقة|حلقة|episode|ep\.?)\s*[-:#]?\s*[0-9٠-٩]+.*$""", RegexOption.IGNORE_CASE),
+            ""
+        )
+        .replace(Regex("""\s*S\d{1,2}\s*E\d+.*$""", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("""\s+"""), " ")
         .trim()
 
     override suspend fun load(url: String): LoadResponse? {
