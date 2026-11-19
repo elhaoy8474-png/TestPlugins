@@ -293,44 +293,6 @@ class CimaClub : MainAPI() {
         }
     }
 
-{
-            val key = seriesKey(title)
-            val related = document.select(".BlocksHolder a.recent--block[href]")
-                .mapNotNull { element ->
-                    val label = element.selectFirst("inner--title h2")?.text()?.trim()
-                        ?.ifBlank { null } ?: element.attr("title").ifBlank { element.text().trim() }
-                    val number = episodeNumber(label) ?: return@mapNotNull null
-                    if (seriesKey(label) != key) return@mapNotNull null
-                    val href = resolveUrl(element.attr("href"))
-                    Triple(number, label, href)
-                }
-            val episodeItems = (related + Triple(currentEpisode ?: 1, title, url))
-                .distinctBy { it.third }
-                .sortedBy { it.first }
-                .map { (number, label, href) ->
-                    newEpisode(href) {
-                        name = label
-                        episode = number
-                        season = 1
-                        posterUrl = poster
-                    }
-                }
-            if (episodeItems.isNotEmpty()) {
-                val seriesTitle = key.ifBlank { title }
-                return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodeItems) {
-                    posterUrl = poster
-                    this.plot = plot
-                    tags = if (category.isBlank()) emptyList() else listOf(category)
-                }
-            }
-        }
-
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            posterUrl = poster
-            this.plot = plot
-            tags = if (category.isBlank()) emptyList() else listOf(category)
-        }
-    }
 
     override suspend fun loadLinks(
         data: String,
