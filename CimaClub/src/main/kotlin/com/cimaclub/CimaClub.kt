@@ -255,7 +255,8 @@ class CimaClub : MainAPI() {
             ?: document.title().substringBefore("|").trim()
         if (title.isBlank()) return null
 
-        val imagePoster = document.selectFirst(".MainSingle .image img")?.let { image ->
+        val posterImage: Element? = document.selectFirst(".MainSingle .image img")
+        val imagePoster: String? = posterImage?.let { image ->
             val raw = image.attr("data-src")
                 .ifBlank { image.attr("data-original") }
                 .ifBlank { image.attr("src") }
