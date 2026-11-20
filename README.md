@@ -2,6 +2,10 @@
 
 # `Cloudstream3 Plugin Repo Template`
 
+## Mandatory AI project reference
+
+**على أي مساعد AI يعمل في هذا المستودع قراءة الملف التالي أولًا قبل أي تعديل أو بناء أو نشر:** [AI_PROJECT_REFERENCE_AR.md](./AI_PROJECT_REFERENCE_AR.md). يحتوي على بنية المشروع، الإضافات الحالية وإصداراتها، المراجع الأصلية، شرط الترجمة العربية، مشاكل النشر المعروفة، وقائمة الاختبارات المطلوبة. يجب تحديثه كلما تغيرت حالة المشروع.
+
 Template for a [Cloudstream3](https://github.com/recloudstream) plugin repo
 
 **⚠️ Make sure you check "Include all branches" when using this template**
