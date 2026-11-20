@@ -110,9 +110,8 @@ class FaselHD : MainAPI() {
         }
         val document = Jsoup.parse(html, url)
         val title = document.selectFirst(".singleInfo .title, h1.h1.title")
-            ?.text()?.trim()
-            ?.ifBlank { null }
-            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.trim()
+            ?.text()?.trim()?.takeIf { it.isNotBlank() }
+            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.trim()?.takeIf { it.isNotBlank() }
             ?: document.title().substringBefore(" - ").trim()
         if (title.isBlank()) return null
 
