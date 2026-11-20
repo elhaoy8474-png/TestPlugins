@@ -123,5 +123,26 @@
         "description": "FaselHD - أفلام ومسلسلات وأنمي",
         "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_2y86K6gY6OINUfekd55EtUoQdOq/3a6504b4-8556-4b21-b0b7-76644334c269.zip",
         "name": "FaselHD"
+    },
+    {
+        "iconUrl": "https://as.alooytv16.com/uploads/system_logo/favicon.ico",
+        "fileHash": "sha256-839842d79423345f3c0d1f4732686872ea66c370216986ae6423c36257ecec20",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 25308,
+        "status": 3,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "AlooyTV",
+        "description": "AlooyTV - أفلام ومسلسلات عربية وخليجية وتركية",
+        "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_2y86K6gY6OINUfekd55EtUoQdOq/823c70e8-1f95-426e-a926-8f9aa90d9d02.zip",
+        "name": "AlooyTV"
     }
 ]
