@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/faselhd-provider
+      - master
     paths:
       - 'FaselHD/**'
       - '.github/workflows/faselhd-validation.yml'
