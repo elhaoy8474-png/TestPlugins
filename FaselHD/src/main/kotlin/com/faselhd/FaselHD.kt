@@ -40,17 +40,14 @@ class FaselHD : MainAPI() {
         FaselHDParser.absoluteUrl(mainUrl, raw)
 
     private fun cardResponse(card: FaselHDParser.Card): SearchResponse {
-        val type = when {
-            card.isMovie -> TvType.Movie
-            card.isAnime -> TvType.Anime
-            else -> TvType.TvSeries
-        }
-        return if (card.isMovie) {
-            newMovieSearchResponse(card.title, card.url, type) {
+        return when {
+            card.isMovie -> newMovieSearchResponse(card.title, card.url, TvType.Movie) {
                 posterUrl = card.poster
             }
-        } else {
-            newTvSeriesSearchResponse(card.title, card.url, type) {
+            card.isAnime -> newAnimeSearchResponse(card.title, card.url, TvType.Anime) {
+                posterUrl = card.poster
+            }
+            else -> newTvSeriesSearchResponse(card.title, card.url, TvType.TvSeries) {
                 posterUrl = card.poster
             }
         }
@@ -185,24 +182,18 @@ class FaselHD : MainAPI() {
                 .ifBlank { element.attr("data-src") }
                 .ifBlank { element.attr("data-subtitle") }
             val subtitleUrl = absoluteUrl(raw)
-            if (subtitleUrl.contains(".vtt", true) || subtitleUrl.contains(".srt", true)) {
-                val language = element.attr("srclang")
-                    .ifBlank { element.attr("label") }
-                    .ifBlank { "Arabic" }
-                if (found.add(subtitleUrl)) {
-                    subtitleCallback(newSubtitleFile(language, subtitleUrl))
-                }
-            }
-        }
-
-        Regex("""https?://[^"'\\\s<>]+?\.(?:vtt|srt)(?:\?[^"'\\\s<>]*)?""", RegexOption.IGNORE_CASE)
-            .findAll(playerHtml)
-            .forEach { match ->
-                val subtitleUrl = match.value.replace("&amp;", "&")
+            val language = element.attr("srclang")
+                .ifBlank { element.attr("label") }
+            val isArabic = language.startsWith("ar", true) ||
+                language.contains("arab", true) ||
+                language.contains("عربي")
+            if (isArabic && (subtitleUrl.contains(".vtt", true) || subtitleUrl.contains(".srt", true))) {
                 if (found.add(subtitleUrl)) {
                     subtitleCallback(newSubtitleFile("Arabic", subtitleUrl))
                 }
             }
+        }
+
     }
 
     private suspend fun extractPlayerLinks(
