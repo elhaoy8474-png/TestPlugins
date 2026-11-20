@@ -10,6 +10,7 @@ on:
       - master
       - main
       - dramabox-diagnostic-v4
+      - feature/faselhd-provider
     paths-ignore:
       - '*.md'
 
