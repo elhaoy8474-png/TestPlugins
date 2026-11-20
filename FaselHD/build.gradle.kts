@@ -8,3 +8,7 @@ cloudstream {
     tvTypes = listOf("Movie", "TvSeries", "Anime")
     iconUrl = "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png"
 }
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
