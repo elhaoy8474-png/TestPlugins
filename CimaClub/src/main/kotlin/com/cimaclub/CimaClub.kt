@@ -75,7 +75,7 @@ class CimaClub : MainAPI() {
         val href = anchor.attr("href").takeIf { it.isNotBlank() } ?: return null
         if (!href.startsWith("http") && !href.startsWith("/")) return null
 
-        val title = anchor.selectFirst("inner--title h2")?.text()?.trim()
+        val title = anchor.selectFirst(".inner--title h2, inner--title h2")?.text()?.trim()
             ?.ifBlank { null }
             ?: anchor.attr("title").takeIf { it.isNotBlank() }
             ?: anchor.text().trim()
@@ -85,13 +85,14 @@ class CimaClub : MainAPI() {
         val url = resolveUrl(href)
         val isSeries = episodeNumber(title) != null ||
             seasonNumber(title) != null ||
+            title.contains("مسلسل", true) ||
+            title.contains("series", true) ||
             title.contains("الحلقة", true) ||
             title.contains("حلقة", true) ||
             title.contains("episode", true) ||
             title.contains("season", true)
 
         return if (isSeries) {
-            // Preserve the full episode/season label for ranking and parent-show grouping.
             newTvSeriesSearchResponse(title, url, TvType.TvSeries) { posterUrl = poster }
         } else {
             newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
@@ -107,20 +108,20 @@ class CimaClub : MainAPI() {
             ".Small--Box a.recent--block[href], a.recent--block[href], .BlocksHolder a[href]"
         ).forEach { element ->
             val result = element.toSearchResult() ?: return@forEach
+            val isSeries = result.type == TvType.TvSeries
+            val cleanTitle = if (isSeries) seriesKey(result.name) else result.name
+            val identity = cleanTitle.lowercase()
+                .replace(Regex("""[\\p{P}\\p{S}\\s]+"""), " ")
+                .trim()
+            if (identity.isBlank()) return@forEach
 
-            if (result.type == TvType.TvSeries) {
-                // Group episodes from every season into one parent-series card.
-                val cleanTitle = seriesKey(result.name)
-                val identity = cleanTitle.lowercase()
-                    .replace(Regex("""[\p{P}\p{S}\s]+"""), " ")
-                    .trim()
-                if (identity.isBlank()) return@forEach
-
-                val key = "series:$identity"
+            // The homepage often repeats the same show in several blocks with different episode URLs.
+            // Deduplicate by the normalized show title, not by URL.
+            val key = (if (isSeries) "series:" else "movie:") + identity
+            if (isSeries) {
                 val rank = (seasonNumber(result.name) ?: 1) * 1000 +
                     (episodeNumber(result.name) ?: 0)
                 val previousRank = seriesRanks[key] ?: Int.MIN_VALUE
-
                 if (!unique.containsKey(key) || rank > previousRank) {
                     unique[key] = newTvSeriesSearchResponse(
                         cleanTitle,
@@ -132,15 +133,10 @@ class CimaClub : MainAPI() {
                     seriesRanks[key] = rank
                 }
             } else {
-                val identity = resolveUrl(result.url)
-                    .substringBefore("?")
-                    .trimEnd('/')
-                    .lowercase()
-                unique.putIfAbsent("url:$identity", result)
+                // Keep the first occurrence and its original position in the homepage.
+                unique.putIfAbsent(key, result)
             }
         }
-
-        // Keep each show's first position while selecting its newest season/episode link.
         return unique.values.toList()
     }
 
