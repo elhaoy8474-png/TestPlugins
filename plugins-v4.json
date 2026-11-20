@@ -101,5 +101,27 @@
         "description": "WeTV - دراما آسيوية بحلقات مجانية وترجمة عربية عند توفرها",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/WeTV.cs3",
         "name": "WeTV"
+    },
+    {
+        "iconUrl": "https://static.faselhdcdn.com/wp-content/themes/faselhd_2020/images/favicon.png",
+        "fileHash": "sha256-cba3f829e554bf07730039d986d08c7f80f3307f56d3010ba7ad3212fdd500f5",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 36691,
+        "status": 3,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "FaselHD",
+        "description": "FaselHD - أفلام ومسلسلات وأنمي",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
+        "name": "FaselHD"
     }
 ]
