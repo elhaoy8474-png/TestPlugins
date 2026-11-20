@@ -126,10 +126,10 @@
     },
     {
         "iconUrl": "https://as.alooytv16.com/uploads/system_logo/favicon.ico",
-        "fileHash": "sha256-839842d79423345f3c0d1f4732686872ea66c370216986ae6423c36257ecec20",
+        "fileHash": "sha256-4614fbe6a5295d9af8b03a6326e57ebac8b1dbc4e18e9357e610983ea81ec214",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 25308,
+        "fileSize": 25575,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -139,10 +139,31 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "AlooyTV",
         "description": "AlooyTV - أفلام ومسلسلات عربية وخليجية وتركية",
-        "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_2y86K6gY6OINUfekd55EtUoQdOq/823c70e8-1f95-426e-a926-8f9aa90d9d02.zip",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/AlooyTV.cs3",
         "name": "AlooyTV"
+    },
+    {
+        "iconUrl": "https://fullmatchshows.com/wp-content/uploads/2024/04/LOGOSASO.png",
+        "fileHash": "sha256-f0691a6f1a229ae4cd8270d61913831d0cf6cb6bf77d2e31742fa588d1b43a4b",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 16687,
+        "status": 3,
+        "language": "en",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "Others"
+        ],
+        "version": 1,
+        "internalName": "FullMatchShows",
+        "description": "FullMatchShows - إعادة مباريات كرة القدم والملخصات",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FullMatchShows.cs3",
+        "name": "FullMatchShows"
     }
 ]
