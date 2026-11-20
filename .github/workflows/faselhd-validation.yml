@@ -79,7 +79,7 @@ jobs:
               "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
               "name": "FaselHD"
           })
-          manifest_path.write_text(json.dumps(plugins, ensure_ascii=False, indent=4) + "\\n", encoding="utf-8")
+          manifest_path.write_text(json.dumps(plugins, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
           PY
           cd publish
           git config user.email "actions@github.com"
