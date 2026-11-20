@@ -29,7 +29,7 @@ class FaselHD : MainAPI() {
   val anchor = selectFirst("a[href]") ?: return null
   val url = anchor.attr("abs:href").ifBlank { return null }
   val image = anchor.selectFirst("img")
-  val title = selectFirst(".postInner .h1")?.text()?.trim()?.ifBlank { null } ?: image?.attr("alt")?.trim().orEmpty()
+  val title = selectFirst(".postInner .h1")?.text()?.trim()?.takeIf { it.isNotBlank() } ?: image?.attr("alt")?.trim().orEmpty()
   if (title.isBlank()) return null
   val poster = image?.let { it.attr("data-src").ifBlank { it.attr("src") } }?.takeIf { it.startsWith("http") }
   val quality = selectFirst(".quality")?.text()
@@ -72,7 +72,7 @@ class FaselHD : MainAPI() {
   }
   val episodes = episodeLinks.map { link ->
    newEpisode(link.attr("abs:href")) {
-    this.name = link.text().trim().ifBlank { null }
+    this.name = link.text().trim()
     this.episode = link.text().firstNumber()
     this.season = doc.selectFirst(".seasonDiv.active .title")?.text()?.firstNumber() ?: 1
    }
