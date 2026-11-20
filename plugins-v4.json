@@ -104,10 +104,10 @@
     },
     {
         "iconUrl": "https://static.faselhdcdn.com/wp-content/themes/faselhd_2020/images/favicon.png",
-        "fileHash": "sha256-cba3f829e554bf07730039d986d08c7f80f3307f56d3010ba7ad3212fdd500f5",
+        "fileHash": "sha256-d4d19fa1a83799720f136f4332a4ecd564b101f41180c91963b7ef2df4de5fc7",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 36691,
+        "fileSize": 37736,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -121,7 +121,7 @@
         "version": 1,
         "internalName": "FaselHD",
         "description": "FaselHD - أفلام ومسلسلات وأنمي",
-        "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_2y86K6gY6OINUfekd55EtUoQdOq/4be16f75-10df-41e2-b733-adcc94116073.zip",
+        "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_2y86K6gY6OINUfekd55EtUoQdOq/3a6504b4-8556-4b21-b0b7-76644334c269.zip",
         "name": "FaselHD"
     }
 ]
