@@ -20,7 +20,7 @@ on:
       - 'settings.gradle.kts'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -46,3 +46,44 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace :FaselHD:testDebugUnitTest :FaselHD:make
+
+      - name: Publish verified FaselHD build and v4 index
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch builds "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" publish
+          cp FaselHD/build/FaselHD.cs3 publish/FaselHD.cs3
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          artifact = Path("publish/FaselHD.cs3")
+          raw = artifact.read_bytes()
+          manifest_path = Path("publish/plugins-v4.json")
+          plugins = json.loads(manifest_path.read_text(encoding="utf-8"))
+          plugins = [p for p in plugins if p.get("internalName") != "FaselHD"]
+          plugins.append({
+              "iconUrl": "https://static.faselhdcdn.com/wp-content/themes/faselhd_2020/images/favicon.png",
+              "fileHash": "sha256-" + hashlib.sha256(raw).hexdigest(),
+              "apiVersion": 1,
+              "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+              "fileSize": len(raw),
+              "status": 3,
+              "language": "ar",
+              "authors": ["elhaoy8474-png"],
+              "tvTypes": ["Movie", "TvSeries", "Anime"],
+              "version": 1,
+              "internalName": "FaselHD",
+              "description": "FaselHD - أفلام ومسلسلات وأنمي",
+              "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
+              "name": "FaselHD"
+          })
+          manifest_path.write_text(json.dumps(plugins, ensure_ascii=False, indent=4) + "\\n", encoding="utf-8")
+          PY
+          cd publish
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add FaselHD.cs3 plugins-v4.json
+          git commit -m "Publish verified FaselHD CloudStream build"
+          git push origin builds
