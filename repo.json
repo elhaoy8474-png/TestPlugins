@@ -1,6 +1,6 @@
 {
   "name": "TestPlugins Repository",
-  "description": "مستودع إضافات CloudStream: AhwakTV وQFilm وViu وCimaClub وWeTV وFaselHD",
+  "description": "مستودع إضافات CloudStream: AhwakTV وQFilm وViu وCimaClub وWeTV وFaselHD وAlooyTV",
   "manifestVersion": 1,
   "pluginLists": [
     "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/plugins-v4.json"
