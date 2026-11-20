@@ -184,11 +184,6 @@ class WeTV : MainAPI() {
         return cipher.doFinal(padded).joinToString("") { byte -> "%02X".format(byte) }
     }
 
-    private fun randomId(length: Int): String = buildString(length) {
-        val alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
-        repeat(length) { append(alphabet[random.nextInt(alphabet.length)]) }
-    }
-
     private fun buildApiUrl(cid: String, videoId: String, episodeUrl: String): String {
         val guid = randomId(16)
         val query = linkedMapOf(
