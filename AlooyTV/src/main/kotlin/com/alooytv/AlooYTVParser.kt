@@ -1,7 +1,9 @@
-package com.alooytv
+package com.alooytv
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import java.net.URI
 
 internal object AlooYTVParser {
@@ -23,6 +25,26 @@ internal object AlooYTVParser {
         val url: String,
         val language: String
     )
+
+    fun parseSearchCards(json: String, baseUrl: String): List<Card> {
+        val root = try { ObjectMapper().readTree(json) } catch (_: Exception) { return emptyList() }
+        val rows: Iterable<JsonNode> = when {
+            root.isArray -> root.toList()
+            root.isObject && root.has("title") -> listOf(root)
+            root.isObject -> listOf("results", "data", "items", "suggestions").map { root.path(it) }.firstOrNull { it.isArray }?.toList().orEmpty()
+            else -> emptyList()
+        }
+        fun JsonNode.firstText(vararg keys: String): String = keys.asSequence().map { path(it).asText("").trim() }.firstOrNull { it.isNotBlank() }.orEmpty()
+        return rows.mapNotNull { item ->
+            val title = item.firstText("title", "name", "label", "value")
+            val rawUrl = item.firstText("url", "link", "href", "permalink")
+            if (title.isBlank() || rawUrl.isBlank()) return@mapNotNull null
+            val rawPoster = item.firstText("image", "poster", "thumbnail", "img")
+            val type = item.firstText("type", "content_type", "category")
+            Card(title, absoluteUrl(baseUrl, rawUrl), rawPoster.takeIf { it.isNotBlank() }?.let { absoluteUrl(baseUrl, it) },
+                type.contains("movie", true) || type.contains("film", true) || type.contains("فيلم") || type.contains("أفلام"))
+        }.distinctBy { it.url }
+    }
 
     fun movieDataUrl(url: String): String = "${url.substringBefore("#")}#alooytv-movie"
 
@@ -147,3 +169,4 @@ internal object AlooYTVParser {
             }.distinctBy { it.url }
     }
 }
+ 
