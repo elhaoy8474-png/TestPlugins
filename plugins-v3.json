@@ -1,0 +1,85 @@
+[
+    {
+        "iconUrl": "https://aahwaktv.beer/favicons/android-icon-192x192.png",
+        "fileHash": "sha256-5c7d686f844fe733bfb03b89813d967a6400eba55f356807310072add437219f",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 20992,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "AhwakTV",
+        "description": "أهواك تي في - أفلام ومسلسلات عربية",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/AhwakTV.cs3",
+        "name": "AhwakTV"
+    },
+    {
+        "iconUrl": "https://w.cimacub.com/wp-content/uploads/2026/08/cropped-cimaclub-150x150.webp",
+        "fileHash": "sha256-e412275ced9a1459bd1a7b9a3326c1e03216247694904e922af4daf52b6985f0",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 21982,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 3,
+        "internalName": "CimaClub",
+        "description": "CimaClub - أفلام ومسلسلات وأنمي مترجم ومدبلج",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/CimaClub-v3.cs3",
+        "name": "CimaClub"
+    },
+    {
+        "iconUrl": "https://movie.qfilm.tv/favicons/android-icon-192x192.png",
+        "fileHash": "sha256-3a3328282debb3c880b2c50539fbca9a4c6e3e7b4924340654d9f7fb76424c83",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 13954,
+        "status": 3,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "QFilm",
+        "description": "QFilm - أفلام عربية وآسيوية",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/QFilm.cs3",
+        "name": "QFilm"
+    },
+    {
+        "iconUrl": "https://www.viu.com/favicon.ico",
+        "fileHash": "sha256-142d74646ecb073004d09878e35fa3f16ef6b6fdd7463179030f2905cf33591c",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 26960,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 10,
+        "internalName": "Viu",
+        "description": "Viu - مسلسلات وأفلام آسيوية وعربية من المصدر الرسمي",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/Viu.cs3",
+        "name": "Viu"
+    }
+]
