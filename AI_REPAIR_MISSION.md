@@ -1,5 +1,7 @@
 # AI Repair Mission — TestPlugins
 
+> **Mandatory first read:** [AI_PROJECT_REFERENCE_AR.md](./AI_PROJECT_REFERENCE_AR.md). Treat it as the permanent project memory and source of truth for repository layout, plugin status, Arabic subtitle requirements, references, release checks, and historical bugs. Update it when facts change.
+
 > Primary goal: make Viu display real catalog items and make AhwakTV open playable movie/series pages and resolve streams, without breaking QFilm.
 > Repository: https://github.com/elhaoy8474-png/TestPlugins
 > Source branch: master
