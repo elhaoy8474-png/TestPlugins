@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.network.WebViewResolver
 import com.lagradost.nicehttp.requestCreator
 import org.jsoup.nodes.Element
 
+// FaselHD provider: Arabic catalog, details and embedded player handling.
 class FaselHD : MainAPI() {
  override var mainUrl = "https://www.fasel-hd.co"
  override var name = "FaselHD"
