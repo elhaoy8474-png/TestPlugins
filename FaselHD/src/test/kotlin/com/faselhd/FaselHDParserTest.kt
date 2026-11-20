@@ -49,4 +49,30 @@ class FaselHDParserTest {
         assertEquals(2, FaselHDParser.seasonNumber("مسلسل Tulsa King الموسم الثاني"))
         assertEquals(4, FaselHDParser.seasonNumber("Show Season 4"))
     }
+
+    @Test
+    fun seasonParsingExtractsAndSortsAllLinkedSeasons() {
+        val html = """
+            <div id="seasonList">
+                <div class="seasonDiv" onclick="window.location.href = '/series/show-season-3'">
+                    <div class="title">موسم 3</div>
+                </div>
+                <div class="seasonDiv active" onclick="window.location.href = '/series/show-season-1'">
+                    <div class="title">موسم 1</div>
+                </div>
+                <div class="seasonDiv" onclick="window.location.href = '/series/show-season-2'">
+                    <div class="title">موسم 2</div>
+                </div>
+            </div>
+        """.trimIndent()
+
+        val seasons = FaselHDParser.parseSeasons(html, "https://www.fasel-hd.co")
+
+        assertEquals(listOf(1, 2, 3), seasons.map { it.number })
+        assertEquals(
+            listOf("https://www.fasel-hd.co/series/show-season-1", "https://www.fasel-hd.co/series/show-season-2", "https://www.fasel-hd.co/series/show-season-3"),
+            seasons.map { it.url }
+        )
+    }
+
 }

@@ -19,6 +19,11 @@ internal object FaselHDParser {
         val number: Int
     )
 
+    internal data class SeasonItem(
+        val url: String,
+        val number: Int
+    )
+
     fun absoluteUrl(baseUrl: String, raw: String): String {
         val value = raw.trim()
             .replace("\\/", "/")
@@ -121,7 +126,7 @@ internal object FaselHDParser {
 
     fun seasonNumber(value: String): Int {
         val normalized = normalizeDigits(value)
-        val numeric = Regex("""(?:الموسم|season)\s*[-:#]?\s*(\d+)""", RegexOption.IGNORE_CASE)
+        val numeric = Regex("""(?:الموسم|موسم|season)\s*[-:#]?\s*(\d+)""", RegexOption.IGNORE_CASE)
             .find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()
         if (numeric != null) return numeric
         val lower = normalized.lowercase()
@@ -138,6 +143,23 @@ internal object FaselHDParser {
             "العاشر" to 10, "العاشرة" to 10
         )
         return words.firstOrNull { lower.contains(it.first) }?.second ?: 1
+    }
+
+
+    fun parseSeasons(html: String, baseUrl: String): List<SeasonItem> {
+        val document = Jsoup.parse(html, baseUrl)
+        val seasons = linkedMapOf<String, SeasonItem>()
+        document.select("#seasonList .seasonDiv[onclick]").forEach { element ->
+            val onclick = element.attr("onclick")
+            val rawUrl = Regex("""(?:window\.)?location\.href\s*=\s*['\"]([^'\"]+)['\"]""")
+                .find(onclick)?.groupValues?.getOrNull(1).orEmpty()
+            if (rawUrl.isBlank()) return@forEach
+            val url = absoluteUrl(baseUrl, rawUrl).substringBefore("#")
+            val label = element.selectFirst(".title")?.text().orEmpty()
+            val number = seasonNumber(label)
+            if (url.startsWith("http")) seasons.putIfAbsent(url, SeasonItem(url, number))
+        }
+        return seasons.values.sortedBy { it.number }
     }
 
     fun parseEpisodes(html: String, baseUrl: String): List<EpisodeItem> {

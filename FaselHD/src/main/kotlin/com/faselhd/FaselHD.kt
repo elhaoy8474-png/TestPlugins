@@ -2,6 +2,8 @@ package com.faselhd
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.network.WebViewResolver
+import com.lagradost.nicehttp.requestCreator
 import org.jsoup.Jsoup
 import java.net.URI
 import java.net.URLEncoder
@@ -33,318 +35,227 @@ class FaselHD : MainAPI() {
         "$mainUrl/asian-series" to "Ù…Ø³Ù„Ø³Ù„Ø§Øª Ø¢Ø³ÙŠÙˆÙŠØ©",
         "$mainUrl/dubbed-movies" to "Ø£ÙÙ„Ø§Ù… Ù…Ø¯Ø¨Ù„Ø¬Ø©",
         "$mainUrl/hindi" to "Ø£ÙÙ„Ø§Ù… Ù‡Ù†Ø¯ÙŠØ©",
-        "$mainUrl/anime" to "Ø£Ù†Ù…ÙŠ"
-    )
+        "$mainUrl/aniÕÈZ®Ëkºwµçkz»§Â+a…æş
+Ş§ûZŠWè­û¥–‹­¦ëJHÂˆ™]\›ˆ[ˆBˆ˜[Øİ[Y[HœÛİ\œ\œÙJ[\›
+Bˆ˜[]HHØİ[Y[œÙ[Xİš\œİ
+‹œÚ[™ÛR[™›È]KKšK]HŠBˆË^
 
-    private fun absoluteUrl(raw: String): String =
-        FaselHDParser.absoluteUrl(mainUrl, raw)
+OËš[J
+OËZÙRYˆÈ]š\Ó›İ›[šÊ
+HBˆÎˆØİ[Y[œÙ[Xİš\œİ
+›Y]VÜ›Ü\O[ÙÎ]WHŠOË˜]Š˜ÛÛ[ŠOËš[J
+OËZÙRYˆÈ]š\Ó›İ›[šÊ
+HBˆÎˆØİ[Y[]J
+KœİXœİš[™Ğ™Y›Ü™JˆHŠKš[J
+BˆYˆ
+]Kš\Ğ›[šÊ
+JH™]\›ˆ[‚ˆ˜[Üİ\ˆHØİ[Y[œÙ[Xİš\œİ
+‹œÜİ\’[YÈ[YË[YËœÜİ\‹Y]VÜ›Ü\O[ÙÎš[XYÙWHŠBˆË›]È[[Y[O‚ˆYˆ
+[[Y[YÓ˜[YJ
+HOH›Y]HŠH[[Y[˜]Š˜ÛÛ[ŠBˆ[ÙH[[Y[˜]Š™]K\Ü˜ÈŠKšY›[šÈÈ[[Y[˜]ŠœÜ˜ÈŠHBˆBˆËZÙRYˆÈ]š\Ó›İ›[šÊ
+HBˆË›]
+˜XœÛÛ]U\›
+B‚ˆ˜[İHØİ[Y[œÙ[Xİš\œİ
+‹œÚ[™ÛQ\ØËY]VÛ˜[YOY\ØÜš\[Û—KY]VÜ›Ü\O[ÙÎ™\ØÜš\[Û—HŠBˆË›]È[[Y[O‚ˆYˆ
+[[Y[YÓ˜[YJ
+HOH›Y]HŠH[[Y[˜]Š˜ÛÛ[ŠH[ÙH[[Y[^
 
-    private fun cardResponse(card: FaselHDParser.Card): SearchResponse {
-        return when {
-            card.isMovie -> newMovieSearchResponse(card.title, card.url, TvType.Movie) {
-                posterUrl = card.poster
-            }
-            card.isAnime -> newAnimeSearchResponse(card.title, card.url, TvType.Anime) {
-                posterUrl = card.poster
-            }
-            else -> newTvSeriesSearchResponse(card.title, card.url, TvType.TvSeries) {
-                posterUrl = card.poster
-            }
-        }
-    }
+BˆBˆËš[J
+BˆËZÙRYˆÈ]š\Ó›İ›[šÊ
+HB‚ˆ˜[˜XÚÙÜ›İ[™HØİ[Y[œÙ[Xİš\œİ
+‹œÚ[™ÛTYÙHŠOË˜]Šœİ[HŠBˆË›]È™YÙ^
+ˆˆ\›
+ÉÈ—OÊŠÊVÉÈ—O×
+HˆˆŠK™š[™
+]
+OË™Ü›İ\˜[Y\ÏË™Ù]
+JHBˆËZÙRYˆÈ]š\Ó›İ›[šÊ
+HBˆË›]
+˜XœÛÛ]U\›
+B‚ˆYˆ
+\Ó[İšYU\›
+\›
+JHÂˆ™]\›ˆ™]Ó[İšYSØY™\ÜÛœÙJ]K\›•\K“[İšYK\›
+HÂˆÜİ\•\›HÜİ\‚ˆ˜XÚÙÜ›İ[™Üİ\•\›H˜XÚÙÜ›İ[™ˆ\ËœİHİˆBˆB‚ˆ˜[ÙX\ÛÛ”YÙ\ÈH[šÙYX\Ùİš[™Ë[Š
+BˆÙX\ÛÛ”YÙ\Öİ\›HH˜\Ù[\œÙ\‹œÙX\ÛÛ“[X™\Š]JBˆ˜\Ù[\œÙ\‹œ\œÙTÙX\ÛÛœÊ[\›
+K™›Ü‘XXÚÈÙX\ÛÛˆO‚ˆÙX\ÛÛ”YÙ\ÖÜÙX\ÛÛ‹\›HHÙX\ÛÛ‹›[X™\‚ˆB‚ˆ˜[\œÙY\\ÛÙ\ÈH[šÙYX\Ùİš[™Ë\\ÛÙOŠ
+Bˆ›Üˆ
 
-    private fun parseCards(html: String): List<SearchResponse> =
-        FaselHDParser.parseCards(html, mainUrl).map(::cardResponse)
+ÙX\ÛÛ•\›ÙX\ÛÛ“[X™\ŠH[ˆÙX\ÛÛ”YÙ\ÊHÂˆ˜[ÙX\ÛÛ’[HYˆ
+ÙX\ÛÛ•\›OH\›
+H[[ÙHHÂˆ\™Ù]
+ÙX\ÛÛ•\›XY\œÈHÙX’XY\œÊK^ˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆÛÛ[YBˆBˆ˜\Ù[\œÙ\‹œ\œÙQ\\ÛÙ\ÊÙX\ÛÛ’[ÙX\ÛÛ•\›
+K™›Ü‘XXÚÈ][HO‚ˆ\œÙY\\ÛÙ\Ëœ]YXœÙ[
+][K\›™]Ñ\\ÛÙJ][K\›
+HÂˆ˜[YHH][K]Bˆ\\ÛÙHH][K›[X™\‚ˆ\ËœÙX\ÛÛˆHÙX\ÛÛ“[X™\‚ˆJBˆBˆBˆ˜[\\ÛÙ\ÈH\œÙY\\ÛÙ\Ë˜[Y\ËœÛÜYÚ]
+ˆÛÛ\\™PO\\ÛÙOˆÈ]œÙX\ÛÛˆÎˆHK[HÈ]™\\ÛÙHÎˆ[“PVÕSQHBˆ
+B‚ˆ˜[\HHYˆ
+\Ğ[š[YU\›
+\›
+JH•\K[š[YH[ÙH•\K•”Ù\šY\Âˆ™]\›ˆ™]Õ”Ù\šY\ÓØY™\ÜÛœÙJ]K\›\K\\ÛÙ\ÊHÂˆÜİ\•\›HÜİ\‚ˆ˜XÚÙÜ›İ[™Üİ\•\›H˜XÚÙÜ›İ[™ˆ\ËœİHİˆBˆB‚ˆš]˜]H[ˆ]X[]U˜[YJX™[ˆİš[™ÊNˆ[Âˆ˜[[X™\ˆH™YÙ^
+ˆˆŠÌËJHˆˆŠK™š[™
+X™[
+OË™Ü›İ\˜[Y\ÏË™Ù]
+JOËÒ[Ü“[
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val base = request.data.trimEnd('/')
-        val url = if (page <= 1) request.data else "$base/page/$page"
-        val html = try {
-            app.get(url, headers = webHeaders).text
-        } catch (_: Exception) {
-            return newHomePageResponse(request.name, emptyList(), false)
-        }
-        val document = Jsoup.parse(html, url)
-        val cards = parseCards(html)
-        val nextPage = document.select("a[href*='/page/" + (page + 1) + "']").isNotEmpty()
-        return newHomePageResponse(request.name, cards, nextPage)
-    }
+Bˆ™]\›ˆÚ[ˆ
+[X™\ŠHÂˆŒMŒOˆ]X[]Y\Ë”ŒMŒ˜[YBˆLOˆ]X[]Y\Ë”L˜[YBˆÌŒOˆ]X[]Y\Ë”ÌŒ˜[YBˆOˆ]X[]Y\Ë”˜[YBˆÍŒOˆ]X[]Y\Ë”ÍŒ˜[YBˆ[ÙHOˆ]X[]Y\Ë•[šÛ›İÛ‹˜[YBˆBˆB‚ˆš]˜]Hİ\Ü[™[ˆÛÛXİİX]\Êˆ^Y\’[ˆİš[™Ëˆ^Y\•\›ˆİš[™ËˆİX]PØ[˜XÚÎˆ
+İX]Qš[JHOˆ[š]ˆ
+HÂˆ˜[Øİ[Y[HœÛİ\œ\œÙJ^Y\’[^Y\•\›
+Bˆ˜[›İ[™H[šÙYÙ]Ùİš[™ÏŠ
+B‚ˆØİ[Y[œÙ[Xİ
+˜XÚÖÜÜ˜×K˜XÚÖÙ]K\Ü˜×KÙ]K\İX]WHŠK™›Ü‘XXÚÈ[[Y[O‚ˆ˜[˜]ÈH[[Y[˜]ŠœÜ˜ÈŠBˆšY›[šÈÈ[[Y[˜]Š™]K\Ü˜ÈŠHBˆšY›[šÈÈ[[Y[˜]Š™]K\İX]HŠHBˆ˜[İX]U\›HXœÛÛ]U\›
+˜]ÊBˆ˜[[™İXYÙHH[[Y[˜]ŠœÜ˜Û[™ÈŠBˆšY›[šÈÈ[[Y[˜]Š›X™[ŠHBˆ˜[\Ğ\˜XšXÈH[™İXYÙKœİ\ÕÚ]
+˜\ˆ‹YJHˆ[™İXYÙK˜ÛÛZ[œÊ˜\˜Xˆ‹YJHˆ[™İXYÙK˜ÛÛZ[œÊ¶.v,v*6bˆŠBˆYˆ
+\Ğ\˜XšXÈ	‰ˆ
+İX]U\›˜ÛÛZ[œÊ‹‹YJHİX]U\›˜ÛÛZ[œÊ‹œÜ‹YJJJHÂˆYˆ
+›İ[™˜Y
+İX]U\›
+JHÂˆİX]PØ[˜XÚÊ™]ÔİX]Qš[J\˜XšXÈ‹İX]U\›
+JBˆBˆBˆB‚ˆB‚ˆš]˜]Hİ\Ü[™[ˆ^˜Xİ^Y\“[šÜÊˆ^Y\•\›ˆİš[™Ëˆ\\ÛÙU\›ˆİš[™ËˆİX]PØ[˜XÚÎˆ
+İX]Qš[JHOˆ[š]ˆØ[˜XÚÎˆ
+^˜XİÜ“[šÊHOˆ[š]ˆ
+Nˆ›ÛÛX[ˆÂˆ˜[^Y\’[HHÂˆ\™Ù]
+ˆ^Y\•\›ˆXY\œÈHÙX’XY\œÈ
+ÈX\ÙŠ”™Y™\™\ˆˆÈ\\ÛÙU\›
+Bˆ
+K^ˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆ™]\›ˆ˜[ÙBˆBˆYˆ
+^Y\’[š\Ğ›[šÊ
+JH™]\›ˆ˜[ÙB‚ˆÛÛXİİX]\Ê^Y\’[^Y\•\›İX]PØ[˜XÚÊB‚ˆ˜[^Y\‘Øİ[Y[HœÛİ\œ\œÙJ^Y\’[^Y\•\›
+Bˆ˜[]ÛœÈH^Y\‘Øİ[Y[œÙ[Xİ
+‹šØ–Ù]K]\›K]Û–Ù]K]\›
+IË›LİN	×HŠBˆ˜[Ûİ\˜Ù\ÈH]ÛœË›X\›İ[È]ÛˆO‚ˆ˜[˜]ÈH]Û‹˜]Š™]K]\›ŠKš[J
+BˆYˆ
+\˜]Ë˜ÛÛZ[œÊ‹›LİN‹YJJH™]\›X\›İ[[ˆ˜[İ™X[U\›HXœÛÛ]U\›
+˜]ÊBˆYˆ
+\İ™X[U\›œİ\ÕÚ]
+šÎ‹ËÈŠJH™]\›X\›İ[[ˆİ™X[U\›È]Û‹^
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        if (query.isBlank()) return emptyList()
-        val encoded = URLEncoder.encode(query, "UTF-8")
-        val url = "$mainUrl/?s=$encoded"
-        val html = try {
-            app.get(url, headers = webHeaders).text
-        } catch (_: Exception) {
-            return emptyList()
-        }
-        return parseCards(html)
-    }
+Kš[J
+KšY›[šÈÈ]]ÈˆBˆK™\İ[˜İHÈ]™š\œİB‚ˆYˆ
+Ûİ\˜Ù\Ëš\Ñ[\J
+JHÂˆËÈHİ\œ™[^Y\ˆZ[È]ÈÛİ\˜ÙH]ÛœÈ[˜[ZXØ[HÚ]˜]˜TØÜš\‚ˆËÈ]H[X™YYœ›İÜÙ\ˆØœÙ\™HHX›XÈÈ™\]Y\İ[œİXYÙ‚ˆËÈZ[™ÈÈXÛÙHÜˆ™XÛÛœİXİ]ÈØ™\ØØ]Y^Y\ˆØÜš\‚ˆ™]\›ˆHÂˆ˜[]]Ô^TØÜš\Hˆˆ‚ˆ
+[˜İ[Ûˆ
 
-    override suspend fun quickSearch(query: String): List<SearchResponse>? =
-        search(query)
+HÂˆYˆ
+Ú[™İË—×ØÜÑ˜\Ù[]]Ô^R[œİ[Y
+H™]\›ÂˆÚ[™İË—×ØÜÑ˜\Ù[]]Ô^R[œİ[YHYNÂˆ˜\ˆ][\ÈHÂˆ˜\ˆ[Y\ˆHÙ][\˜[
+[˜İ[Ûˆ
 
-    private fun isMovieUrl(url: String): Boolean {
-        val path = try { URI(url).path.orEmpty().lowercase() } catch (_: Exception) { url.lowercase() }
-        return path.startsWith("/movies/") ||
-            path.startsWith("/asian-movies/") ||
-            path.startsWith("/anime-movies/") ||
-            path.startsWith("/dubbed-movies/") ||
-            path.startsWith("/hindi/")
-    }
+HÂˆ][\ÊÊÎÂˆHÂˆ˜\ˆ^Y\ˆHÚ[™İË›XZ[”^Y\ˆˆ
+Ú[™İËšÜ^Y\ˆÈÚ[™İËšÜ^Y\Š
+Hˆ[
+NÂˆYˆ
+^Y\ˆ	‰ˆ\[Ùˆ^Y\‹œ^HOOH	Ù[˜İ[Û‰ÊHÂˆ^Y\‹œ^JYJNÂˆBˆYˆ
+^Y\ˆ	‰ˆ^Y\‹™Ù]İ]H	‰ˆ^Y\‹™Ù]İ]J
+HOOH	Ü^Z[™ÉÊHÂˆÛX\’[\˜[
+[Y\ŠNÂˆBˆHØ]Ú
+JHÈBˆYˆ
+][\ÈHL
+HÛX\’[\˜[
+[Y\ŠNÂˆKÌ
+NÂˆJJ
+NÂˆˆˆ‹š[R[™[
 
-    private fun isAnimeUrl(url: String): Boolean {
-        val path = try { URI(url).path.orEmpty().lowercase() } catch (_: Exception) { url.lowercase() }
-        return path.startsWith("/anime/")
-    }
+Bˆ˜[™\ÛÛ™YHÙX•šY]Ô™\ÛÛ™\Šˆ[\˜Ù\\›H™YÙ^
+ˆˆ—›LİN
+Î‰ÏÈ×JHˆˆŠKˆØÜš\H]]Ô^TØÜš\ˆ[Y[İ]HWÌˆ
+Kœ™\ÛÛ™U\Ú[™ÕÙX•šY]Êˆ™\]Y\İÜ™X]ÜŠ‘ÑU‹^Y\•\›™Y™\™\ˆH\\ÛÙU\›
+Bˆ
+K™š\œİˆ˜[İ™X[U\›H™\ÛÛ™YË\›ËÔİš[™Ê
+OËZÙRYˆÈ]œİ\ÕÚ]
+šŠHBˆÎˆ™]\›ˆ˜[ÙBˆ˜[Ù[™\˜]YHLİN[\‹™Ù[™\˜]SLİN
+ˆ˜[YKˆİ™X[U\›ˆ™Y™\™\ˆH^Y\•\›ˆXY\œÈHX\ÙŠ•\Ù\‹PYÙ[ˆÈ\ÚİÜXK“ÜšYÚ[ˆˆÈXZ[•\›
+Bˆ
+BˆYˆ
+Ù[™\˜]Yš\Ñ[\J
+JHÂˆØ[˜XÚÊˆ™]Ñ^˜XİÜ“[šÊˆÛİ\˜ÙHH˜[YKˆ˜[YHH‰˜[YHHÈ‹ˆ\›Hİ™X[U\›ˆ\HH^˜XİÜ“[šÕ\K“LÕNˆ
+HÂˆ™Y™\™\ˆH^Y\•\›ˆ]X[]HH]X[]Y\Ë•[šÛ›İÛ‹˜[YBˆXY\œÈHX\ÙŠ•\Ù\‹PYÙ[ˆÈ\ÚİÜXK“ÜšYÚ[ˆˆÈXZ[•\›
+BˆBˆ
+BˆH[ÙHÙ[™\˜]Y™›Ü‘XXÚ
+Ø[˜XÚÊBˆYBˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆ˜[ÙBˆBˆBˆ˜[]]ÔÛİ\˜ÙHHÛİ\˜Ù\Ë™š\œİÜ“[Âˆ]œÙXÛÛ™˜ÛÛZ[œÊ˜]]È‹YJH]œÙXÛÛ™˜ÛÛZ[œÊ¶*¶a6`¶)ö)¶bˆŠBˆBˆ˜[Ù[XİYÛİ\˜Ù\ÈHYˆ
+]]ÔÛİ\˜ÙHOH[
+H\İÙŠ]]ÔÛİ\˜ÙJH[ÙHÛİ\˜Ù\Âˆ˜[İ™X[RXY\œÈHX\ÙŠˆ•\Ù\‹PYÙ[ˆÈ\ÚİÜXKˆ”™Y™\™\ˆˆÈ^Y\•\›ˆ“ÜšYÚ[ˆˆÈXZ[•\›ˆ
+B‚ˆ˜\ˆ›İ[™H˜[ÙBˆ›Üˆ
 
-    override suspend fun load(url: String): LoadResponse? {
-        val html = try {
-            app.get(url, headers = webHeaders).text
-        } catch (_: Exception) {
-            return null
-        }
-        val document = Jsoup.parse(html, url)
-        val title = document.selectFirst(".singleInfo .title, h1.h1.title")
-            ?.text()?.trim()?.takeIf { it.isNotBlank() }
-            ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.trim()?.takeIf { it.isNotBlank() }
-            ?: document.title().substringBefore(" - ").trim()
-        if (title.isBlank()) return null
+İ™X[U\›X™[
+H[ˆÙ[XİYÛİ\˜Ù\ÊHÂˆHÂˆ˜[X\İ\•^H\™Ù]
+İ™X[U\›XY\œÈHİ™X[RXY\œÊK^ˆ˜[İX]S[™\ÈH™YÙ^
+ˆˆˆˆÑVVSQQPN–×———J•TOTÕP•UTÖ×———Jˆˆˆ‹ˆ™YÙ^Ü[Û‹’QÓ“Ô‘WĞĞTÑBˆ
+K™š[™[
+X\İ\•^
+BˆİX]S[™\Ë™›Ü‘XXÚÈ[™HO‚ˆ˜[^H[™K˜[YBˆ˜[[™İXYÙHH™YÙ^
+ˆˆ“S‘ÕPQÑOHŠ×ˆ—JÊHˆˆˆ‹™YÙ^Ü[Û‹’QÓ“Ô‘WĞĞTÑJBˆ™š[™
+^
+OË™Ü›İ\˜[Y\ÏË™Ù]
+JK›Ü‘[\J
+Bˆ˜[İX]S˜[YHH™YÙ^
+ˆˆ“SQOHŠ×ˆ—JÊHˆˆˆ‹™YÙ^Ü[Û‹’QÓ“Ô‘WĞĞTÑJBˆ™š[™
+^
+OË™Ü›İ\˜[Y\ÏË™Ù]
+JK›Ü‘[\J
+Bˆ˜[\šHH™YÙ^
+ˆˆ•T’OHŠ×ˆ—JÊHˆˆˆ‹™YÙ^Ü[Û‹’QÓ“Ô‘WĞĞTÑJBˆ™š[™
+^
+OË™Ü›İ\˜[Y\ÏË™Ù]
+JK›Ü‘[\J
+BˆYˆ
+\šKš\Ó›İ›[šÊ
+H	‰ˆ
+[™İXYÙKœİ\ÕÚ]
+˜\ˆ‹YJHˆİX]S˜[YK˜ÛÛZ[œÊ˜\˜Xˆ‹YJHİX]S˜[YK˜ÛÛZ[œÊ¶.v,v*6bˆŠJJHÂˆİX]PØ[˜XÚÊ™]ÔİX]Qš[J\˜XšXÈ‹XœÛÛ]U\›
+\šJJJBˆBˆBˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆËÈH^Y\ˆX^Hİ[^ÜÙH\ØX›H˜\šX[È›İYÚ]È]X[]H]ÛœË‚ˆB‚ˆHÂˆ˜[Ù[™\˜]YHLİN[\‹™Ù[™\˜]SLİN
+ˆ˜[YKˆİ™X[U\›ˆ^Y\•\›ˆXY\œÈHİ™X[RXY\œÂˆ
+BˆYˆ
+Ù[™\˜]Yš\Ó›İ[\J
+JHÂˆÙ[™\˜]Y™›Ü‘XXÚ
+Ø[˜XÚÊBˆ›İ[™HYBˆH[ÙHÂˆØ[˜XÚÊˆ™]Ñ^˜XİÜ“[šÊˆÛİ\˜ÙHH˜[YKˆ˜[YHH‰˜[YHH	X™[‹ˆ\›Hİ™X[U\›ˆ\HH^˜XİÜ“[šÕ\K“LÕNˆ
+HÂˆ™Y™\™\ˆH^Y\•\›ˆ]X[]HH]X[]U˜[YJX™[
+BˆXY\œÈHİ™X[RXY\œÂˆBˆ
+Bˆ›İ[™HYBˆBˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆËÈÛÛ[YHÚ][H™[XZ[š[™ÈX›XÛH\İY]X[]H[šÜË‚ˆBˆBˆ™]\›ˆ›İ[™ˆB‚ˆİ™\œšYHİ\Ü[™[ˆØY[šÜÊˆ]Nˆİš[™Ëˆ\ĞØ\İ[™Îˆ›ÛÛX[‹ˆİX]PØ[˜XÚÎˆ
+İX]Qš[JHOˆ[š]ˆØ[˜XÚÎˆ
+^˜XİÜ“[šÊHOˆ[š]ˆ
+Nˆ›ÛÛX[ˆÂˆ˜[œ™\Ú\\ÛÙU\›H]H
+È
+Yˆ
+]K˜ÛÛZ[œÊÈŠJH‰ˆˆ[ÙHÈŠH
+Âˆ˜Ü×Û›ØØXÚOHˆ
+ÈŞ\İ[K˜İ\œ™[[YSZ[\Ê
+Bˆ˜[\\ÛÙR[HHÂˆ\™Ù]
+œ™\Ú\\ÛÙU\›XY\œÈHÙX’XY\œÈ
+ÈX\ÙŠØXÚKPÛÛ›ÛˆÈ››ËXØXÚHŠJH^ˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆ™]\›ˆ˜[ÙBˆBˆ˜[Øİ[Y[HœÛİ\œ\œÙJ\\ÛÙR[]JBˆ˜[^Y\•\›ÈH[šÙYÙ]Ùİš[™ÏŠ
+BˆØİ[Y[œÙ[Xİ
+ˆ–Û˜[YO\^Y\—ÚYœ˜[YWVÙ]K\Ü˜×KYœ˜[YVÜÜ˜×KYœ˜[YVÙ]K\Ü˜×KÙ]K\Ü˜ÊIİšY[×Ü^Y\‰×H‚ˆ
+K™›Ü‘XXÚÈ[[Y[O‚ˆ˜[˜]ÈH[[Y[˜]Š™]K\Ü˜ÈŠBˆšY›[šÈÈ[[Y[˜]ŠœÜ˜ÈŠHBˆš[J
+BˆYˆ
+˜]Ëš\Ğ›[šÊ
+JH™]\››Ü‘XXÚˆ˜[^Y\•\›HXœÛÛ]U\›
+˜]ÊBˆYˆ
+^Y\•\›œİ\ÕÚ]
+XZ[•\›
+H	‰ˆ^Y\•\›˜ÛÛZ[œÊšY[×Ü^Y\ˆŠJHÂˆ^Y\•\›Ë˜Y
+^Y\•\›
+BˆBˆB‚ˆ˜\ˆ›İ[™H˜[ÙBˆ›Üˆ
+^Y\•\›[ˆ^Y\•\›ÊHÂˆYˆ
+^˜Xİ^Y\“[šÜÊ^Y\•\›]KİX]PØ[˜XÚËØ[˜XÚÊJHÂˆ›İ[™HYBˆBˆB‚ˆYˆ
+Y›İ[™
+HÂˆ˜[^\›˜[œ˜[Y\ÈHØİ[Y[œÙ[Xİ
+šYœ˜[YVÜÜ˜×KYœ˜[YVÙ]K\Ü˜×HŠK›X\›İ[Èœ˜[YHO‚ˆ˜[˜]ÈHœ˜[YK˜]ŠœÜ˜ÈŠKšY›[šÈÈœ˜[YK˜]Š™]K\Ü˜ÈŠHKš[J
+BˆYˆ
+˜]Ëš\Ğ›[šÊ
+JH™]\›X\›İ[[ˆ˜[œ˜[YU\›HXœÛÛ]U\›
+˜]ÊBˆœ˜[YU\›ZÙRYˆÈ]œİ\ÕÚ]
+šŠH	‰ˆZ]œİ\ÕÚ]
+XZ[•\›
+HBˆK™\İ[˜İ
 
-        val poster = document.selectFirst(".posterImg img, img.poster, meta[property=og:image]")
-            ?.let { element ->
-                if (element.tagName() == "meta") element.attr("content")
-                else element.attr("data-src").ifBlank { element.attr("src") }
-            }
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::absoluteUrl)
-
-        val plot = document.selectFirst(".singleDesc, meta[name=description], meta[property=og:description]")
-            ?.let { element ->
-                if (element.tagName() == "meta") element.attr("content") else element.text()
-            }
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-
-        val background = document.selectFirst(".singlePage")?.attr("style")
-            ?.let { Regex("""url\(['"]?(.*?)['"]?\)""").find(it)?.groupValues?.get(1) }
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::absoluteUrl)
-
-        if (isMovieUrl(url)) {
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                posterUrl = poster
-                backgroundPosterUrl = background
-                this.plot = plot
-            }
-        }
-
-        val season = FaselHDParser.seasonNumber(title)
-        val episodes = FaselHDParser.parseEpisodes(html, url).map { item ->
-            newEpisode(item.url) {
-                name = item.title
-                episode = item.number
-                season = season
-            }
-        }
-
-        val type = if (isAnimeUrl(url)) TvType.Anime else TvType.TvSeries
-        return newTvSeriesLoadResponse(title, url, type, episodes) {
-            posterUrl = poster
-            backgroundPosterUrl = background
-            this.plot = plot
-        }
-    }
-
-    private fun qualityValue(label: String): Int {
-        val number = Regex("""(\d{3,4})""").find(label)?.groupValues?.get(1)?.toIntOrNull()
-        return when (number) {
-            2160 -> Qualities.P2160.value
-            1080 -> Qualities.P1080.value
-            720 -> Qualities.P720.value
-            480 -> Qualities.P480.value
-            360 -> Qualities.P360.value
-            else -> Qualities.Unknown.value
-        }
-    }
-
-    private fun collectSubtitles(
-        playerHtml: String,
-        playerUrl: String,
-        subtitleCallback: (SubtitleFile) -> Unit
-    ) {
-        val document = Jsoup.parse(playerHtml, playerUrl)
-        val found = linkedSetOf<String>()
-
-        document.select("track[src], track[data-src], [data-subtitle]").forEach { element ->
-            val raw = element.attr("src")
-                .ifBlank { element.attr("data-src") }
-                .ifBlank { element.attr("data-subtitle") }
-            val subtitleUrl = absoluteUrl(raw)
-            val language = element.attr("srclang")
-                .ifBlank { element.attr("label") }
-            val isArabic = language.startsWith("ar", true) ||
-                language.contains("arab", true) ||
-                language.contains("Ø¹Ø±Ø¨ÙŠ")
-            if (isArabic && (subtitleUrl.contains(".vtt", true) || subtitleUrl.contains(".srt", true))) {
-                if (found.add(subtitleUrl)) {
-                    subtitleCallback(newSubtitleFile("Arabic", subtitleUrl))
-                }
-            }
-        }
-
-    }
-
-    private suspend fun extractPlayerLinks(
-        playerUrl: String,
-        episodeUrl: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val playerHtml = try {
-            app.get(
-                playerUrl,
-                headers = webHeaders + mapOf("Referer" to episodeUrl)
-            ).text
-        } catch (_: Exception) {
-            return false
-        }
-        if (playerHtml.isBlank()) return false
-
-        collectSubtitles(playerHtml, playerUrl, subtitleCallback)
-
-        val playerDocument = Jsoup.parse(playerHtml, playerUrl)
-        val buttons = playerDocument.select(".hd_btn[data-url], button[data-url*='.m3u8']")
-        if (buttons.isEmpty()) return false
-
-        val sources = buttons.mapNotNull { button ->
-            val raw = button.attr("data-url").trim()
-            if (!raw.contains(".m3u8", true)) return@mapNotNull null
-            val streamUrl = absoluteUrl(raw)
-            if (!streamUrl.startsWith("https://")) return@mapNotNull null
-            streamUrl to button.text().trim().ifBlank { "Auto" }
-        }.distinctBy { it.first }
-
-        if (sources.isEmpty()) return false
-        val autoSource = sources.firstOrNull {
-            it.second.contains("auto", true) || it.second.contains("ØªÙ„Ù‚Ø§Ø¦ÙŠ")
-        }
-        val selectedSources = if (autoSource != null) listOf(autoSource) else sources
-        val streamHeaders = mapOf(
-            "User-Agent" to desktopUa,
-            "Referer" to playerUrl,
-            "Origin" to mainUrl
-        )
-
-        var found = false
-        for ((streamUrl, label) in selectedSources) {
-            try {
-                val masterText = app.get(streamUrl, headers = streamHeaders).text
-                val subtitleLines = Regex(
-                    """#EXT-X-MEDIA:[^\r\n]*TYPE=SUBTITLES[^\r\n]*""",
-                    RegexOption.IGNORE_CASE
-                ).findAll(masterText)
-                subtitleLines.forEach { line ->
-                    val text = line.value
-                    val language = Regex("""LANGUAGE="([^"]+)"""", RegexOption.IGNORE_CASE)
-                        .find(text)?.groupValues?.get(1).orEmpty()
-                    val subtitleName = Regex("""NAME="([^"]+)"""", RegexOption.IGNORE_CASE)
-                        .find(text)?.groupValues?.get(1).orEmpty()
-                    val uri = Regex("""URI="([^"]+)"""", RegexOption.IGNORE_CASE)
-                        .find(text)?.groupValues?.get(1).orEmpty()
-                    if (uri.isNotBlank() && (language.startsWith("ar", true) ||
-                                subtitleName.contains("arab", true) || subtitleName.contains("Ø¹Ø±Ø¨ÙŠ"))) {
-                        subtitleCallback(newSubtitleFile("Arabic", absoluteUrl(uri)))
-                    }
-                }
-            } catch (_: Exception) {
-                // The player may still expose usable variants through its quality buttons.
-            }
-
-            try {
-                val generated = M3u8Helper.generateM3u8(
-                    name,
-                    streamUrl,
-                    playerUrl,
-                    headers = streamHeaders
-                )
-                if (generated.isNotEmpty()) {
-                    generated.forEach(callback)
-                    found = true
-                } else {
-                    callback(
-                        newExtractorLink(
-                            source = name,
-                            name = "$name - $label",
-                            url = streamUrl,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            referer = playerUrl
-                            quality = qualityValue(label)
-                            headers = streamHeaders
-                        }
-                    )
-                    found = true
-                }
-            } catch (_: Exception) {
-                // Continue with any remaining publicly listed quality links.
-            }
-        }
-        return found
-    }
-
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val episodeHtml = try {
-            app.get(data, headers = webHeaders).text
-        } catch (_: Exception) {
-            return false
-        }
-        val document = Jsoup.parse(episodeHtml, data)
-        val playerUrls = linkedSetOf<String>()
-        document.select(
-            "[name=player_iframe][data-src], iframe[src], iframe[data-src], [data-src*='video_player']"
-        ).forEach { element ->
-            val raw = element.attr("data-src")
-                .ifBlank { element.attr("src") }
-                .trim()
-            if (raw.isBlank()) return@forEach
-            val playerUrl = absoluteUrl(raw)
-            if (playerUrl.startsWith(mainUrl) && playerUrl.contains("video_player")) {
-                playerUrls.add(playerUrl)
-            }
-        }
-
-        var found = false
-        for (playerUrl in playerUrls) {
-            if (extractPlayerLinks(playerUrl, data, subtitleCallback, callback)) {
-                found = true
-            }
-        }
-
-        if (!found) {
-            val externalFrames = document.select("iframe[src], iframe[data-src]").mapNotNull { frame ->
-                val raw = frame.attr("src").ifBlank { frame.attr("data-src") }.trim()
-                if (raw.isBlank()) return@mapNotNull null
-                val frameUrl = absoluteUrl(raw)
-                frameUrl.takeIf { it.startsWith("http") && !it.startsWith(mainUrl) }
-            }.distinct()
-
-            for (frameUrl in externalFrames) {
-                try {
-                    if (loadExtractor(frameUrl, data, subtitleCallback, callback)) {
-                        found = true
-                    }
-                } catch (_: Exception) {
-                    // Keep trying the remaining publicly exposed player frames.
-                }
-            }
-        }
-        return found
-    }
-}
+B‚ˆ›Üˆ
+œ˜[YU\›[ˆ^\›˜[œ˜[Y\ÊHÂˆHÂˆYˆ
+ØY^˜XİÜŠœ˜[YU\›]KİX]PØ[˜XÚËØ[˜XÚÊJHÂˆ›İ[™HYBˆBˆHØ]Ú
+Îˆ^Ù\[ÛŠHÂˆËÈÙY\Z[™ÈH™[XZ[š[™ÈX›XÛH^ÜÙY^Y\ˆœ˜[Y\Ë‚ˆBˆBˆBˆ™]\›ˆ›İ[™ˆBŸB
