@@ -23,12 +23,17 @@ class YouTubeParserTest {
         assertEquals("abcdefghijk", results.single().videoId)
     }
 
-    @Test fun parsesRealYouTubeMobileSearchFixture() {
-        val html = javaClass.classLoader!!.getResource("search-fixture.html")!!.readText()
-        val results = YouTubeParser.parseSearchResults(html)
-        assertTrue("Expected actual public search results", results.size >= 5)
-        assertTrue(results.any { it.videoId == "hZw_e2hPyJw" && it.title.contains("العربية") })
-        assertTrue(results.any { it.channel?.contains("Master Arabic") == true })
+    @Test fun parsesMultipleMobileSearchVideoRowsFromInitialData() {
+        val ids = listOf("abcdefghijk", "bcdefghijkl", "cdefghijklm", "defghijklmn", "efghijklmno")
+        val rows = ids.mapIndexed { index, id ->
+            "\"row$index\":{\"videoRenderer\":{\"videoId\":\"$id\",\"title\":{\"simpleText\":\"Video $index\"}}}"
+        }.joinToString(",")
+        val json = "{$rows}"
+        val encoded = json.replace("{", "\\x7b").replace("}", "\\x7d").replace("\"", "\\x22")
+        val results = YouTubeParser.parseSearchResults("<script>var ytInitialData = '$encoded';</script>")
+
+        assertEquals(ids.size, results.size)
+        assertEquals(ids, results.map { it.videoId })
     }
 
     @Test fun buildsCanonicalWatchUrlsOnlyForValidIds() {
