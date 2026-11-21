@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - master
+      - fix/youtube-v3-newpipe-cloud3
       - main
       - dramabox-diagnostic-v4
       - feature/faselhd-provider
