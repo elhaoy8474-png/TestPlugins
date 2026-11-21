@@ -52,14 +52,45 @@ class YouTube : MainAPI() {
     ): Boolean {
         val watchUrl = data.takeIf { it.startsWith("https://") } ?: YouTubeParser.watchUrl(data) ?: return false
         var found = false
-        return try {
+
+        // Keep CloudStream's standard extractor as the primary path.
+        try {
             YoutubeExtractor().getUrl(watchUrl, null, subtitleCallback) { link ->
                 found = true
                 callback(link)
             }
-            found
         } catch (_: Exception) {
-            found
+            // Some YouTube responses expose muxed video+audio streams only.
+            // The bundled extractor currently returns no link for that case.
         }
+
+        // Fallback for YouTube videos that have muxed streams but no video-only streams.
+        if (!found) {
+            val info = YouTubeStreamFallback.loadStreamInfo(watchUrl)
+            val streams = info?.let(YouTubeStreamFallback::muxedVideoStreams).orEmpty()
+            for (stream in streams) {
+                val streamUrl = YouTubeStreamFallback.readString(stream, "getContent")
+                    ?.takeIf { it.startsWith("http") } ?: continue
+                val height = YouTubeStreamFallback.readInt(stream, "getHeight")
+                val codec = YouTubeStreamFallback.readString(stream, "getCodec")
+                    ?.substringBefore('.')?.uppercase()?.takeIf { it.isNotBlank() }
+                callback(newExtractorLink(name, "YouTube ${height?.let { "${it}p" } ?: "Video"}${codec?.let { " $it" } ?: ""}", streamUrl) {
+                    quality = height ?: Qualities.Unknown.value
+                    referer = watchUrl
+                })
+                found = true
+            }
+
+            info?.let(YouTubeStreamFallback::subtitles)?.forEach { subtitle ->
+                val subtitleUrl = YouTubeStreamFallback.readString(subtitle, "getContent")
+                    ?.takeIf { it.startsWith("http") } ?: return@forEach
+                val language = YouTubeStreamFallback.readString(subtitle, "getDisplayLanguageName")
+                    ?: YouTubeStreamFallback.readString(subtitle, "getLanguageTag")
+                    ?: "Unknown"
+                subtitleCallback(newSubtitleFile(language, subtitleUrl))
+            }
+        }
+
+        return found
     }
 }
