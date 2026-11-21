@@ -2,6 +2,7 @@ package com.youtube
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.extractors.YoutubeExtractor
+import android.util.Log
 import com.lagradost.cloudstream3.utils.*
 import java.net.URLEncoder
 
@@ -51,20 +52,31 @@ class YouTube : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchUrl = data.takeIf { it.startsWith("https://") } ?: YouTubeParser.watchUrl(data) ?: return false
+        if (!YouTubeNewPipeRuntime.ensureInitialized()) {
+            Log.e("YouTubePlugin", "NewPipe is unavailable and could not be initialized; no playback link can be extracted.")
+            return false
+        }
+
+        // Backport the current YouTube client-version discovery used by newer NewPipe.
+        // The host app bundles 0.26.3, whose legacy sw.js parser no longer works.
+        if (!YouTubeNewPipeRuntime.primeClientVersion()) {
+            Log.w("YouTubePlugin", "Could not refresh the YouTube client version; trying the bundled extractor fallback.")
+        }
+
         var found = false
 
-        // Keep CloudStream's standard extractor as the primary path.
+        // Use CloudStream's extractor first. It now has an initialized NewPipe downloader.
         try {
             YoutubeExtractor().getUrl(watchUrl, null, subtitleCallback) { link ->
                 found = true
                 callback(link)
             }
-        } catch (_: Exception) {
-            // Some YouTube responses expose muxed video+audio streams only.
-            // The bundled extractor currently returns no link for that case.
+        } catch (error: Exception) {
+            // Keep the fallback, but do not hide the root error from diagnostics.
+            Log.e("YouTubePlugin", "CloudStream YoutubeExtractor failed: ${error.javaClass.simpleName}: ${error.message}", error)
         }
 
-        // Fallback for YouTube videos that have muxed streams but no video-only streams.
+        // Fallback for videos that expose muxed video+audio streams only.
         if (!found) {
             val info = YouTubeStreamFallback.loadStreamInfo(watchUrl)
             val streams = info?.let(YouTubeStreamFallback::muxedVideoStreams).orEmpty()
