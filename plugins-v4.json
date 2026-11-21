@@ -165,5 +165,25 @@
         "description": "FullMatchShows - إعادة مباريات كرة القدم والملخصات",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FullMatchShows.cs3",
         "name": "FullMatchShows"
+    },
+    {
+        "iconUrl": "https://www.youtube.com/s/desktop/95c3254f/img/favicon_144x144.png",
+        "fileHash": "sha256-9526ed0334dcd22e483d2bd343364c184b4e4083861b492334b80f5ef610e86d",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 14705,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "YouTube",
+        "description": "YouTube search and public video playback with available captions",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/YouTube.cs3",
+        "name": "YouTube"
     }
 ]
