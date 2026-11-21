@@ -1,10 +1,14 @@
 package com.youtube
 
+import android.util.Log
+
 /** Reflection adapter for NewPipe's StreamInfo, which is bundled by CloudStream at runtime. */
 internal object YouTubeStreamFallback {
     fun loadStreamInfo(watchUrl: String): Any? = runCatching {
         val streamInfo = Class.forName("org.schabi.newpipe.extractor.stream.StreamInfo")
         streamInfo.getMethod("getInfo", String::class.java).invoke(null, watchUrl)
+    }.onFailure { error ->
+        Log.e("YouTubePlugin", "NewPipe StreamInfo extraction failed: ${error.javaClass.simpleName}: ${error.message}", error)
     }.getOrNull()
 
     fun muxedVideoStreams(info: Any): List<Any> = readList(info, "getVideoStreams")
