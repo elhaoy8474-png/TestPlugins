@@ -168,10 +168,10 @@
     },
     {
         "iconUrl": "https://www.youtube.com/s/desktop/95c3254f/img/favicon_144x144.png",
-        "fileHash": "sha256-2d93d8a339985fb56f53dfd7bb7d59fe8b3e9b132d23a199acf365c8e7d1f028",
+        "fileHash": "sha256-151ae003b01991a8503fd3bcdafc226936e6c8567687972abf334f4a56563e1b",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 18968,
+        "fileSize": 26048,
         "status": 1,
         "language": "en",
         "authors": [
@@ -180,10 +180,10 @@
         "tvTypes": [
             "Movie"
         ],
-        "version": 2,
+        "version": 3,
         "internalName": "YouTube",
         "description": "YouTube search and public video playback with available captions",
-        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/2133ac5a5bc361f349155c5c07676bace404ccec/YouTube.cs3",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/d600fad76a6b4f4754e232d7678b4ff0db1a0ead/YouTube.cs3",
         "name": "YouTube"
     }
 ]
