@@ -1,4 +1,4 @@
-version = 3
+version = 2
 
 cloudstream {
     language = "en"
@@ -10,8 +10,5 @@ cloudstream {
 }
 
 dependencies {
-    // The host app ships NewPipeExtractor; compile against it without bundling a duplicate.
-    compileOnly("com.github.teamnewpipe:NewPipeExtractor:v0.26.3")
-    testImplementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.3")
     testImplementation("junit:junit:4.13.2")
 }
