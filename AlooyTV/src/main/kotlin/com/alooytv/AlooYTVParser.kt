@@ -1,4 +1,4 @@
-package com.alooytv
+package com.alooytv
 
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -169,4 +169,3 @@ internal object AlooYTVParser {
             }.distinctBy { it.url }
     }
 }
- 
