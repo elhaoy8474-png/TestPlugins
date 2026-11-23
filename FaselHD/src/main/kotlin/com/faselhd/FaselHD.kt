@@ -7,7 +7,7 @@ import java.net.URI
 import java.net.URLEncoder
 
 class FaselHD : MainAPI() {
-    override var mainUrl = "https://www.fasel-hd.co"
+    override var mainUrl = "https://www.faselhd.cc"
     override var name = "FaselHD"
     override var lang = "ar"
     override val hasMainPage = true

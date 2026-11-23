@@ -75,4 +75,31 @@ class FaselHDParserTest {
         )
     }
 
+
+    @Test
+    fun liveSearchMarkupParsesMoviesSeriesAnimeAndSeasonCards() {
+        val html = """
+            <div class="postDiv">
+                <a href="/movies/movie-one"><img alt="فيلم البحث الأول" src="/movie.jpg"></a>
+            </div>
+            <div class="postDiv">
+                <a href="/tvshows/show-one"><img alt="برنامج البحث الأول" src="/show.jpg"></a>
+            </div>
+            <div class="postDiv">
+                <a href="/seasons/series-one"><img alt="مسلسل البحث الأول" src="/series.jpg"></a>
+            </div>
+            <div class="postDiv">
+                <a href="/anime/anime-one"><img alt="أنمي البحث الأول" src="/anime.jpg"></a>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(4, cards.size)
+        assertTrue(cards.any { it.isMovie && it.title == "فيلم البحث الأول" })
+        assertTrue(cards.any { !it.isMovie && !it.isAnime && it.url.contains("/tvshows/") })
+        assertTrue(cards.any { !it.isMovie && !it.isAnime && it.url.contains("/seasons/") })
+        assertTrue(cards.any { it.isAnime && it.title == "أنمي البحث الأول" })
+    }
+
 }

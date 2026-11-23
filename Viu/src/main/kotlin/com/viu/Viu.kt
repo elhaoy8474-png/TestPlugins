@@ -12,6 +12,7 @@ class Viu : MainAPI() {
     override var name = "Viu"
     override var lang = "ar"
     override val hasMainPage = true
+    override val hasQuickSearch = true
     override val hasDownloadSupport = false
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
@@ -22,8 +23,8 @@ class Viu : MainAPI() {
         "Origin" to mainUrl,
         "Referer" to "$mainUrl/"
     )
-    private var areaId = "1000"
-    private var languageFlagId = "3"
+    private var areaId = "1003"
+    private var languageFlagId = "6"
     private var bearerToken: String? = null
     private var tokenExpiryTime: Long = 0L
 
@@ -203,31 +204,40 @@ class Viu : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        val keyword = query.trim()
+        if (keyword.isBlank()) return emptyList()
+
         loadSiteSettings()
         return try {
-            val searchApi = "$api/api/mobile?r=%2Fsearch%2Fvideo&language_flag_id=$languageFlagId&cpreference_id=&platform_flag_label=web"
-            val body = JSONObject().apply {
-                put("keyword", JSONArray().put(query))
-                put("url", searchApi)
-            }.toString()
-            val url = "$mainUrl/ott/$region/index.php?r=vod/jsonp&area_id=$areaId&language_flag_id=$languageFlagId&cpreference_id="
-            val headers = webHeaders + mapOf("Content-Type" to "application/json")
-            val root = json(app.post(url, headers = headers, json = JSONObject(body)).text) ?: return emptyList()
+            val url = ViuSearchRequest.buildUrl(
+                api = api,
+                query = keyword,
+                areaId = areaId,
+                languageFlagId = languageFlagId,
+                countryCode = region
+            )
+            val root = json(app.get(url, headers = webHeaders + mapOf(
+                "Accept" to "application/json"
+            )).text) ?: return emptyList()
             val data = root.optJSONObject("data") ?: return emptyList()
             val out = mutableListOf<SearchResponse>()
-            val series = data.optJSONArray("series") ?: JSONArray()
-            for (i in 0 until series.length()) {
-                val item = series.optJSONObject(i) ?: continue
-                itemResponse(item)?.let(out::add)
-            }
-            val products = data.optJSONArray("product") ?: JSONArray()
-            for (i in 0 until products.length()) {
-                val item = products.optJSONObject(i) ?: continue
-                itemResponse(item, item.optString("series_name"))?.let(out::add)
+
+            // The current Viu search API returns separate series, movie and product arrays.
+            for (key in listOf("series", "movie", "micro_drama", "product")) {
+                val items = data.optJSONArray(key) ?: continue
+                for (i in 0 until items.length()) {
+                    val item = items.optJSONObject(i) ?: continue
+                    itemResponse(item, firstText(item, "series_name", "name"))?.let(out::add)
+                }
             }
             out.distinctBy { it.url }
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
+
+    override suspend fun quickSearch(query: String): List<SearchResponse>? =
+        search(query)
 
     override suspend fun load(url: String): LoadResponse? {
         loadSiteSettings()

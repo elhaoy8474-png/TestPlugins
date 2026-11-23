@@ -1,4 +1,4 @@
-version = 10
+version = 11
 
 cloudstream {
     language = "ar"
@@ -7,4 +7,5 @@ cloudstream {
     status = 1
     tvTypes = listOf("Movie", "TvSeries")
     iconUrl = "https://www.viu.com/favicon.ico"
+    testImplementation("junit:junit:4.13.2")
 }
