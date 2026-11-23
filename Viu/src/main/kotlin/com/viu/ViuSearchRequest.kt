@@ -15,8 +15,10 @@ internal object ViuSearchRequest {
         countryCode: String
     ): String {
         val keyword = URLEncoder.encode(query.trim(), "UTF-8")
+        // The reference Viu web client sends both snake_case and camelCase aliases.
         return "$api/api/mobile?r=%2Fsearch%2Fvideo&keyword=$keyword&page=1&limit=20" +
             "&area_id=$areaId&language_flag_id=$languageFlagId" +
-            "&countryCode=${countryCode.uppercase()}&platform_flag_label=web&ut=0"
+            "&countryCode=${countryCode.uppercase()}&platform_flag_label=web" +
+            "&areaId=$areaId&languageFlagId=$languageFlagId&platformFlagLabel=web&ut=0"
     }
 }
