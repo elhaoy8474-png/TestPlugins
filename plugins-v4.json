@@ -63,10 +63,10 @@
     },
     {
         "iconUrl": "https://www.viu.com/favicon.ico",
-        "fileHash": "sha256-142d74646ecb073004d09878e35fa3f16ef6b6fdd7463179030f2905cf33591c",
+        "fileHash": "sha256-88c163d6a6e4c81fe0620220d493b1f73468aed5c68058fc9848ae6c21cade13",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 26960,
+        "fileSize": 27090,
         "status": 1,
         "language": "ar",
         "authors": [
@@ -76,7 +76,7 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 10,
+        "version": 11,
         "internalName": "Viu",
         "description": "Viu - مسلسلات وأفلام آسيوية وعربية من المصدر الرسمي",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/Viu.cs3",
@@ -103,11 +103,11 @@
         "name": "WeTV"
     },
     {
-        "iconUrl": "https://static.faselhdcdn.com/wp-content/themes/faselhd_2020/images/favicon.png",
-        "fileHash": "sha256-d4d19fa1a83799720f136f4332a4ecd564b101f41180c91963b7ef2df4de5fc7",
+        "iconUrl": "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png",
+        "fileHash": "sha256-31d8a8a8ac460a7760efa8bd85f257a3e9c4a57b85fe80ff41fbf87a81ab12d2",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 37736,
+        "fileSize": 37737,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -118,10 +118,10 @@
             "TvSeries",
             "Anime"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "FaselHD",
-        "description": "FaselHD - أفلام ومسلسلات وأنمي",
-        "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_2y86K6gY6OINUfekd55EtUoQdOq/3a6504b4-8556-4b21-b0b7-76644334c269.zip",
+        "description": "FaselHD - أفلام ومسلسلات وأنمي مع صفحات عربية",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
         "name": "FaselHD"
     },
     {
