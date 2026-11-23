@@ -20,7 +20,7 @@ class FaselHDParserTest {
             </div>
         """.trimIndent()
 
-        val cards = FaselHDParser.parseCards(html, "https://www.fasel-hd.co")
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
 
         assertEquals(2, cards.size)
         assertTrue(cards.any { it.isMovie && it.title == "فيلم مترجم" })
@@ -38,7 +38,7 @@ class FaselHDParserTest {
             </div>
         """.trimIndent()
 
-        val episodes = FaselHDParser.parseEpisodes(html, "https://www.fasel-hd.co")
+        val episodes = FaselHDParser.parseEpisodes(html, "https://www.faselhd.cc")
 
         assertEquals(listOf(1, 2, 10), episodes.map { it.number })
     }
@@ -66,11 +66,11 @@ class FaselHDParserTest {
             </div>
         """.trimIndent()
 
-        val seasons = FaselHDParser.parseSeasons(html, "https://www.fasel-hd.co")
+        val seasons = FaselHDParser.parseSeasons(html, "https://www.faselhd.cc")
 
         assertEquals(listOf(1, 2, 3), seasons.map { it.number })
         assertEquals(
-            listOf("https://www.fasel-hd.co/series/show-season-1", "https://www.fasel-hd.co/series/show-season-2", "https://www.fasel-hd.co/series/show-season-3"),
+            listOf("https://www.faselhd.cc/series/show-season-1", "https://www.faselhd.cc/series/show-season-2", "https://www.faselhd.cc/series/show-season-3"),
             seasons.map { it.url }
         )
     }
