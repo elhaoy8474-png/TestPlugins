@@ -77,9 +77,23 @@ class FaselHD : MainAPI() {
         val html = try {
             app.get(url, headers = webHeaders).text
         } catch (_: Exception) {
-            return emptyList()
+            ""
         }
-        return parseCards(html)
+        val pageResults = parseCards(html)
+        if (pageResults.isNotEmpty()) return pageResults
+
+        // The primary cs-ar reference uses FaselHD's public WordPress live-search
+        // action when the normal ?s= page has no result cards.
+        return try {
+            val ajaxHtml = app.post(
+                "$mainUrl/wp-admin/admin-ajax.php",
+                headers = webHeaders + mapOf("Referer" to url),
+                data = mapOf("action" to "dtc_live", "trsearch" to query)
+            ).text
+            parseCards(ajaxHtml)
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? =
