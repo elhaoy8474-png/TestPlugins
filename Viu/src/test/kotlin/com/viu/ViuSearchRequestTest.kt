@@ -19,5 +19,6 @@ class ViuSearchRequestTest {
         assertTrue(url.contains("page=1&limit=20"))
         assertTrue(url.contains("area_id=1003&language_flag_id=6"))
         assertTrue(url.contains("countryCode=EG&platform_flag_label=web"))
+        assertTrue(url.contains("&areaId=1003&languageFlagId=6&platformFlagLabel=web&ut=0"))
     }
 }
