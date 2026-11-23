@@ -78,20 +78,37 @@ internal object FaselHDParser {
     fun parseCards(html: String, baseUrl: String): List<Card> {
         val document = Jsoup.parse(html, baseUrl)
         val cards = linkedMapOf<String, Card>()
-        document.select("a[href]").forEach { anchor ->
+
+        // FaselHD search results use .postDiv cards. The title (.h1) can be
+        // a sibling of the image link, not a descendant of the anchor itself.
+        // Parse the whole card first, then fall back to generic linked cards.
+        val postCards = document.select(".postDiv")
+        val candidates: List<Element> = if (postCards.isNotEmpty()) postCards else document.select("a[href]")
+
+        candidates.forEach { candidate ->
+            val anchor = if (candidate.tagName().equals("a", true)) {
+                candidate
+            } else {
+                candidate.selectFirst("a[href]") ?: return@forEach
+            }
             val href = anchor.attr("href").trim()
             if (href.isBlank()) return@forEach
             val url = absoluteUrl(baseUrl, href).substringBefore("#")
             val path = try { URI(url).path.orEmpty() } catch (_: Exception) { "" }
             val kind = classify(path) ?: return@forEach
-            val hasCardImage = anchor.selectFirst("img") != null ||
-                anchor.parent()?.selectFirst("img") != null ||
-                anchor.parent()?.parent()?.selectFirst("img") != null
-            if (!hasCardImage) return@forEach
 
-            val title = anchor.cardTitle()
+            val image = candidate.selectFirst("img")
+                ?: anchor.selectFirst("img")
+                ?: anchor.parent()?.selectFirst("img")
+            if (image == null) return@forEach
+
+            val title = candidate.selectFirst(".h1, .title, .h2, .h3, .h4, .h5")
+                ?.text()?.trim().orEmpty()
+                .ifBlank { anchor.cardTitle() }
             if (title.isBlank() || title.length > 220) return@forEach
-            cards.putIfAbsent(url, Card(title, url, anchor.cardPoster(baseUrl), kind.first, kind.second))
+
+            val poster = candidate.cardPoster(baseUrl) ?: anchor.cardPoster(baseUrl)
+            cards.putIfAbsent(url, Card(title, url, poster, kind.first, kind.second))
         }
         return cards.values.toList()
     }
