@@ -63,10 +63,10 @@
     },
     {
         "iconUrl": "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png",
-        "fileHash": "sha256-31d8a8a8ac460a7760efa8bd85f257a3e9c4a57b85fe80ff41fbf87a81ab12d2",
+        "fileHash": "sha256-48c7430bfcbc05b1ea3c34aa6d1b80d49f45ad83c9503be469656c86908672a7",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 37737,
+        "fileSize": 38601,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -77,7 +77,7 @@
             "TvSeries",
             "Anime"
         ],
-        "version": 2,
+        "version": 3,
         "internalName": "FaselHD",
         "description": "FaselHD - \u0623\u0641\u0644\u0627\u0645 \u0648\u0645\u0633\u0644\u0633\u0644\u0627\u062a \u0648\u0623\u0646\u0645\u064a \u0645\u0639 \u0635\u0641\u062d\u0627\u062a \u0639\u0631\u0628\u064a\u0629",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
@@ -126,10 +126,10 @@
     },
     {
         "iconUrl": "https://www.viu.com/favicon.ico",
-        "fileHash": "sha256-88c163d6a6e4c81fe0620220d493b1f73468aed5c68058fc9848ae6c21cade13",
+        "fileHash": "sha256-baa1636c976ce4f32c1ad6d151901ca1c36462e00df5be02ae574365b8025dda",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 27090,
+        "fileSize": 27386,
         "status": 1,
         "language": "ar",
         "authors": [
@@ -139,7 +139,7 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 11,
+        "version": 12,
         "internalName": "Viu",
         "description": "Viu - \u0645\u0633\u0644\u0633\u0644\u0627\u062a \u0648\u0623\u0641\u0644\u0627\u0645 \u0622\u0633\u064a\u0648\u064a\u0629 \u0648\u0639\u0631\u0628\u064a\u0629 \u0645\u0646 \u0627\u0644\u0645\u0635\u062f\u0631 \u0627\u0644\u0631\u0633\u0645\u064a",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/Viu.cs3",
