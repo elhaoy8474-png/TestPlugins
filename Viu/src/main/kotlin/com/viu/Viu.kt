@@ -216,9 +216,13 @@ class Viu : MainAPI() {
                 languageFlagId = languageFlagId,
                 countryCode = region
             )
-            val root = json(app.get(url, headers = webHeaders + mapOf(
-                "Accept" to "application/json"
-            )).text) ?: return emptyList()
+            val searchReferer = "$mainUrl/ott/$region/en-us/search?keyword=${URLEncoder.encode(keyword, "UTF-8")}"
+            val searchHeaders = webHeaders + mapOf(
+                "Accept" to "application/json",
+                "Accept-Language" to "ar-EG,ar;q=0.9,en;q=0.8",
+                "Referer" to searchReferer
+            )
+            val root = json(app.get(url, headers = searchHeaders).text) ?: return emptyList()
             val data = root.optJSONObject("data") ?: return emptyList()
             val out = mutableListOf<SearchResponse>()
 
