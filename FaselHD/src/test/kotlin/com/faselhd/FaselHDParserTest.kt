@@ -102,4 +102,21 @@ class FaselHDParserTest {
         assertTrue(cards.any { it.isAnime && it.title == "أنمي البحث الأول" })
     }
 
+    
+    @Test
+    fun searchCardUsesTitleOutsideAnchorAndKeepsPoster() {
+        val html = """
+            <div class="postDiv">
+                <a href="/movies/movie-one"><img src="/poster.jpg" alt=""></a>
+                <h2 class="h1">عنوان البحث خارج الرابط</h2>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(1, cards.size)
+        assertEquals("عنوان البحث خارج الرابط", cards.single().title)
+        assertEquals("https://www.faselhd.cc/poster.jpg", cards.single().poster)
+    }
+
 }
