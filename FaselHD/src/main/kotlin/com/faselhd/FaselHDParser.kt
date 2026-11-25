@@ -71,7 +71,10 @@ internal object FaselHDParser {
         if (normalized.startsWith("/series/") ||
             normalized.startsWith("/seasons/") ||
             normalized.startsWith("/asian-series/") ||
-            normalized.startsWith("/tvshows/")) return false to false
+            normalized.startsWith("/tvshows/") ||
+            normalized.startsWith("/recent_series/") ||
+            normalized.startsWith("/recent_tvshows/") ||
+            normalized.startsWith("/tv-shows/")) return false to false
         return null
     }
 
@@ -83,7 +86,14 @@ internal object FaselHDParser {
         // a sibling of the image link, not a descendant of the anchor itself.
         // Parse the whole card first, then fall back to generic linked cards.
         val postCards = document.select(".postDiv")
-        val candidates: List<Element> = if (postCards.isNotEmpty()) postCards else document.select("a[href]")
+        // Prefer the current card wrapper, but also inspect supported content
+        // anchors. Some search responses omit the wrapper class for a subset
+        // of results; the URL-keyed map below safely removes duplicates.
+        val candidates: List<Element> = postCards + document.select(
+            "#postList a[href], .postDiv a[href], a[href*='/movies/'], " +
+                "a[href*='/anime/'], a[href*='/series/'], a[href*='/seasons/'], " +
+                "a[href*='/asian-movies/'], a[href*='/asian-series/'], a[href*='/tvshows/']"
+        )
 
         candidates.forEach { candidate ->
             val anchor = if (candidate.tagName().equals("a", true)) {

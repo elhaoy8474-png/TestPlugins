@@ -1,4 +1,4 @@
-version = 1
+version = 2
 
 cloudstream {
     language = "ar"
@@ -6,5 +6,9 @@ cloudstream {
     description = "QFilm - أفلام عربية وآسيوية"
     status = 3
     tvTypes = listOf("Movie")
-    iconUrl = "https://movie.qfilm.tv/favicons/android-icon-192x192.png"
+    iconUrl = "https://a.qfilm.tv/favicons/android-icon-192x192.png"
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
 }

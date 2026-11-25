@@ -104,6 +104,40 @@ class FaselHDParserTest {
 
     
     @Test
+    fun liveWordPressSearchCardsWithCurrentMarkupAreParsed() {
+        val html = """
+            <div class="wrapPage">
+                <div id="postList">
+                    <div class="col-xl-2">
+                        <div class="postDiv">
+                            <a href="https://www.faselhd.cc/movies/avatar-fire-and-ash">
+                                <div class="imgdiv-class">
+                                    <img src="https://static.faselhdcdn.com/avatar.jpg"
+                                         data-src="https://static.faselhdcdn.com/avatar.jpg"
+                                         alt="فيلم Avatar: Fire and Ash 2025 مترجم">
+                                </div>
+                                <div class="postInner">
+                                    <div class="h1">فيلم Avatar: Fire and Ash 2025 مترجم</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    <a href="https://www.faselhd.cc/anime/avatar-season-3">
+                        <img src="/avatar-series.jpg" alt="انمي Avatar الموسم الثالث">
+                        <div class="h1">انمي Avatar الموسم الثالث</div>
+                    </a>
+                </div>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(2, cards.size)
+        assertTrue(cards.any { it.isMovie && it.poster == "https://static.faselhdcdn.com/avatar.jpg" })
+        assertTrue(cards.any { it.isAnime && it.poster == "https://www.faselhd.cc/avatar-series.jpg" })
+    }
+
+    @Test
     fun searchCardUsesTitleOutsideAnchorAndKeepsPoster() {
         val html = """
             <div class="postDiv">

@@ -2,8 +2,6 @@ package com.qfilm
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Element
-import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.net.URI
 import android.util.Base64
@@ -12,7 +10,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 class QFilm : MainAPI() {
-    override var mainUrl = "https://movie.qfilm.tv"
+    override var mainUrl = "https://a.qfilm.tv"
     override var name = "QFilm"
     override var lang = "ar"
     override val hasMainPage = true
@@ -29,27 +27,12 @@ class QFilm : MainAPI() {
         "$mainUrl/category.php?cat=asian-movies" to "أفلام آسيوية"
     )
 
-    private fun Element.toResult(): SearchResponse? {
-        val anchor = if (tagName() == "a") this else
-            selectFirst("a[href*='play.php?vid='], a[href*='watch.php?vid=']") ?: selectFirst("a[href]") ?: return null
-        val href = anchor.attr("href").takeIf { it.isNotBlank() } ?: return null
-        if (!href.contains("play.php?vid=") && !href.contains("watch.php?vid=")) return null
-        val title = anchor.attr("title").ifBlank { anchor.text() }
-            .ifBlank { anchor.selectFirst("img")?.attr("alt").orEmpty() }.trim()
-        if (title.isBlank()) return null
-        val image: Element? = anchor.selectFirst("img") ?: selectFirst("img")
-        val poster: String? = image?.let {
-            it.attr("data-src").ifBlank { it.attr("data-original") }.ifBlank { it.attr("src") }
-        }?.takeIf { it.isNotBlank() }?.let { resolveUrl(it) }
-        val url = resolveUrl(href)
-        return newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = poster }
-    }
-
-    private fun extractResults(html: String): List<SearchResponse> {
-        val doc = Jsoup.parse(html, mainUrl)
-        return doc.select("a[href*='play.php?vid='], a[href*='watch.php?vid='], .pm-video-thumb, .video-item, .movie-item, .thumbnail")
-            .mapNotNull { it.toResult() }.distinctBy { it.url }
-    }
+    private fun extractResults(html: String): List<SearchResponse> =
+        QFilmParser.parseCards(html, mainUrl).map { card ->
+            newMovieSearchResponse(card.title, card.url, TvType.Movie) {
+                posterUrl = card.poster
+            }
+        }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page <= 1) request.data else {
