@@ -42,11 +42,11 @@
         "name": "CimaClub"
     },
     {
-        "iconUrl": "https://movie.qfilm.tv/favicons/android-icon-192x192.png",
-        "fileHash": "sha256-3a3328282debb3c880b2c50539fbca9a4c6e3e7b4924340654d9f7fb76424c83",
+        "iconUrl": "https://a.qfilm.tv/favicons/android-icon-192x192.png",
+        "fileHash": "sha256-338d75e418004aea498cef2a8d68971115e6202179e01bf6ee3ebcff3e5c6073",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 13954,
+        "fileSize": 15206,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -55,7 +55,7 @@
         "tvTypes": [
             "Movie"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "QFilm",
         "description": "QFilm - أفلام عربية وآسيوية",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/QFilm.cs3",
@@ -104,10 +104,10 @@
     },
     {
         "iconUrl": "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png",
-        "fileHash": "sha256-48c7430bfcbc05b1ea3c34aa6d1b80d49f45ad83c9503be469656c86908672a7",
+        "fileHash": "sha256-97e2c50e661eccb47dad526be2a5abeb042824ac50ea5543ed4ca5220da79cf2",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 38601,
+        "fileSize": 38698,
         "status": 3,
         "language": "ar",
         "authors": [
@@ -118,7 +118,7 @@
             "TvSeries",
             "Anime"
         ],
-        "version": 3,
+        "version": 4,
         "internalName": "FaselHD",
         "description": "FaselHD - أفلام ومسلسلات وأنمي مع صفحات عربية",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
