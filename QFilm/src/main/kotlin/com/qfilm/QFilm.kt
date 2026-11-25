@@ -2,6 +2,7 @@ package com.qfilm
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.net.URI
 import android.util.Base64
