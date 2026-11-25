@@ -1,4 +1,4 @@
-name: Validate FaselHD
+name: Validate Provider Parsers
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - master
     paths:
       - 'FaselHD/**'
+      - 'QFilm/**'
       - '.github/workflows/faselhd-validation.yml'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
@@ -42,10 +43,10 @@ jobs:
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Run parser tests and build FaselHD
+      - name: Run parser tests and build QFilm and FaselHD
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace :FaselHD:testDebugUnitTest :FaselHD:make
+          ./gradlew --no-daemon --stacktrace :FaselHD:testDebugUnitTest :FaselHD:make :QFilm:testDebugUnitTest :QFilm:make
 
       - name: Publish verified FaselHD build and v4 index
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
