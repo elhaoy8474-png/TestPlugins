@@ -78,9 +78,9 @@ jobs:
               "language": "ar",
               "authors": ["elhaoy8474-png"],
               "tvTypes": ["Movie", "TvSeries", "Anime"],
-              "version": 6,
+              "version": 7,
               "internalName": "FaselHD",
-              "description": "FaselHD v6 - live catalog and episode route compatibility",
+              "description": "FaselHD v7 - hardened live requests and canonical host fallback",
               "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
               "name": "FaselHD"
           })
