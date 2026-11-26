@@ -251,4 +251,38 @@ class FaselHDParserTest {
         assertTrue(FaselHDParser.parseCards(html, "https://www.faselhd.cc").isEmpty())
     }
 
+
+    @Test
+    fun animeMovieCardsAreClassifiedAsMovies() {
+        val html = """
+            <div class="postDiv">
+                <a href="/anime-movies/film-one">
+                    <img src="/anime-movie.jpg" alt="فيلم أنمي">
+                    <div class="h1">فيلم أنمي</div>
+                </a>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(1, cards.size)
+        assertTrue(cards.single().isMovie)
+        assertFalse(cards.single().isAnime)
+    }
+
+    @Test
+    fun animeEpisodeLinksAreParsedFromAnimeDetailPages() {
+        val html = """
+            <div id="epAll">
+                <a href="/anime-episodes/hunter-episode-10">الحلقة ١٠</a>
+                <a href="/anime-episodes/hunter-episode-2">الحلقة ٢</a>
+            </div>
+        """.trimIndent()
+
+        val episodes = FaselHDParser.parseEpisodes(html, "https://www.faselhd.cc")
+
+        assertEquals(listOf(2, 10), episodes.map { it.number })
+        assertTrue(episodes.all { it.url.contains("/anime-episodes/") })
+    }
+
 }
