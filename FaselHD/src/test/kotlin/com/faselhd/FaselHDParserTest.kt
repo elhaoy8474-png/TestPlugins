@@ -312,4 +312,70 @@ class FaselHDParserTest {
         assertTrue(cards.single().isMovie)
     }
 
+
+    @Test
+    fun liveBlockMovieCardsUseSiblingTitleAndLazyPoster() {
+        val html = """
+            <div class="blockMovie">
+                <a href="/movies/the-mosquito-bowl">
+                    <img src="https://static.faselhdcdn.com/blank.gif"
+                         data-src="https://static.faselhdcdn.com/the-mosquito-bowl.jpg"
+                         alt="The Mosquito Bowl">
+                </a>
+                <div class="blockMovieMeta">
+                    <h5 class="h5">The Mosquito Bowl 2026 مترجم</h5>
+                </div>
+            </div>
+            <div class="blockMovie">
+                <a href="/series/sample-series">
+                    <img src="https://static.faselhdcdn.com/blank.gif"
+                         data-src="https://static.faselhdcdn.com/sample-series.jpg"
+                         alt="">
+                </a>
+                <div class="blockMovieMeta">
+                    <h5 class="h5">مسلسل Sample Series</h5>
+                </div>
+            </div>
+            <div class="blockMovie">
+                <a href="/episodes/sample-episode-1">
+                    <img src="/episode.jpg" alt="الحلقة 1">
+                </a>
+                <div class="blockMovieMeta"><h5>الحلقة 1</h5></div>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc/main")
+
+        assertEquals(2, cards.size)
+        assertTrue(cards.any {
+            it.isMovie &&
+                it.title == "The Mosquito Bowl 2026 مترجم" &&
+                it.poster == "https://static.faselhdcdn.com/the-mosquito-bowl.jpg"
+        })
+        assertTrue(cards.any {
+            !it.isMovie &&
+                it.title == "مسلسل Sample Series" &&
+                it.poster == "https://static.faselhdcdn.com/sample-series.jpg"
+        })
+        assertFalse(cards.any { it.url.contains("/episodes/") })
+    }
+
+    @Test
+    fun cloudflareChallengePageIsDetectedSeparatelyFromCatalogMarkup() {
+        val challenge = """
+            <html><head><title>Just a moment...</title></head>
+            <body><div id="cf-challenge-running">Checking your browser</div>
+            <script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script></body></html>
+        """.trimIndent()
+        val normal = """
+            <html><head><title>FaselHD</title></head>
+            <body><div class="blockMovie"><a href="/movies/movie-one">
+            <img data-src="/poster.jpg" alt="Movie one"></a></div></body></html>
+        """.trimIndent()
+
+        assertTrue(FaselHDParser.isChallengePage(challenge))
+        assertFalse(FaselHDParser.isChallengePage(normal))
+        assertEquals(0, FaselHDParser.parseCards(challenge, "https://www.faselhd.cc").size)
+    }
+
 }

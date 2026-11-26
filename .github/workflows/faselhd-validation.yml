@@ -78,9 +78,9 @@ jobs:
               "language": "ar",
               "authors": ["elhaoy8474-png"],
               "tvTypes": ["Movie", "TvSeries", "Anime"],
-              "version": 7,
+              "version": 8,
               "internalName": "FaselHD",
-              "description": "FaselHD v7 - hardened live requests and canonical host fallback",
+              "description": "FaselHD v8 - live block cards and user-operated Cloudflare verification",
               "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
               "name": "FaselHD"
           })

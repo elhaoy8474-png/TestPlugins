@@ -37,6 +37,22 @@ internal object FaselHDParser {
         }
     }
 
+    fun isChallengePage(html: String): Boolean {
+        if (html.isBlank()) return false
+        val lower = html.lowercase()
+        val markers = listOf(
+            "cf-chl-",
+            "challenge-platform",
+            "cdn-cgi/challenge-platform",
+            "just a moment",
+            "checking your browser",
+            "verify you are human",
+            "performing security verification",
+            "enable javascript and cookies to continue"
+        )
+        return markers.any { lower.contains(it) }
+    }
+
     private fun Element.cardTitle(): String {
         val imageTitle = selectFirst("img")?.attr("alt").orEmpty().trim()
         val title = imageTitle
@@ -94,17 +110,15 @@ internal object FaselHDParser {
         // a sibling of the image link, not a descendant of the anchor itself.
         // Parse the whole card first, then fall back to generic linked cards.
         val postCards = document.select(".postDiv")
-        // The live /main landing page uses featured swiper slides instead of
-        // .postDiv cards. Their title and poster live together in .slideContent.
+        // The live /main page uses .blockMovie wrappers. Titles may be siblings
+        // of the poster link, so parse the wrapper instead of only the anchor.
+        val blockMovieCards = document.select(".blockMovie")
         val featuredCards = document.select(".slideContent")
-        // Prefer complete card wrappers, then fall back to supported content
-        // anchors. The URL-keyed map safely removes duplicate links.
-        val candidates: List<Element> = postCards + featuredCards + document.select(
-            "#postList a[href], .postDiv a[href], a[href*='/movies/'], " +
-                "a[href*='/anime/'], a[href*='/series/'], a[href*='/seasons/'], " +
-                "a[href*='/asian-movies/'], a[href*='/asian-series/'], " +
-                "a[href*='/asian_seasons/'], a[href*='/anime-movies/'], a[href*='/tvshows/']"
-        )
+
+        // classify() filters navigation/episode links; the URL-keyed map
+        // removes duplicate anchors found inside the same card wrapper.
+        val candidates: List<Element> =
+            postCards + blockMovieCards + featuredCards + document.select("a[href]")
 
         candidates.forEach { candidate ->
             val anchor = if (candidate.tagName().equals("a", true)) {

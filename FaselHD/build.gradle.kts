@@ -1,9 +1,9 @@
-version = 7
+version = 8
 
 cloudstream {
     language = "ar"
     authors = listOf("elhaoy8474-png")
-    description = "FaselHD v7 - hardened live requests and canonical host fallback"
+    description = "FaselHD v8 - live block cards and user-operated Cloudflare verification"
     status = 3
     tvTypes = listOf("Movie", "TvSeries", "Anime")
     iconUrl = "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png"
