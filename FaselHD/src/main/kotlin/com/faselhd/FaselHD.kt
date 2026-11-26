@@ -25,17 +25,18 @@ class FaselHD : MainAPI() {
         "Referer" to "$mainUrl/"
     )
 
-    // /main is only a navigation landing page on the current site and contains
-    // no catalog cards. Point CloudStream sections at actual catalog endpoints.
+    // Use only real catalog pages that contain series/movie cards.
+    // The "recent" feeds are episode pages, not series listings, so they
+    // intentionally stay out of the home catalog.
     override val mainPage = mainPageOf(
-        "$mainUrl/all-movies" to "جميع الأفلام",
         "$mainUrl/movies" to "أفلام أجنبية",
-        "$mainUrl/series" to "مسلسلات أجنبية",
-        "$mainUrl/recent_series" to "أحدث المسلسلات",
+        "$mainUrl/dubbed-movies" to "أفلام مدبلجة",
+        "$mainUrl/hindi" to "أفلام هندية",
         "$mainUrl/asian-movies" to "أفلام آسيوية",
+        "$mainUrl/anime-movies" to "أفلام أنمي",
+        "$mainUrl/series" to "مسلسلات أجنبية",
         "$mainUrl/asian-series" to "مسلسلات آسيوية",
         "$mainUrl/anime" to "أنمي",
-        "$mainUrl/anime-movies" to "أفلام أنمي",
         "$mainUrl/tvshows" to "برامج",
         "$mainUrl/recent_tvshows" to "أحدث البرامج"
     )
@@ -106,6 +107,7 @@ class FaselHD : MainAPI() {
     private fun isMovieUrl(url: String): Boolean {
         val path = try { URI(url).path.orEmpty().lowercase() } catch (_: Exception) { url.lowercase() }
         return path.startsWith("/movies/") ||
+            path.startsWith("/anime-movies/") ||
             path.startsWith("/asian-movies/") ||
             path.startsWith("/anime-movies/") ||
             path.startsWith("/dubbed-movies/") ||
