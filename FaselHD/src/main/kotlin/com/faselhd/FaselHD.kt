@@ -20,10 +20,42 @@ class FaselHD : MainAPI() {
 
     private val webHeaders = mapOf(
         "User-Agent" to desktopUa,
-        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language" to "ar-EG,ar;q=0.9,en;q=0.7",
-        "Referer" to "$mainUrl/"
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language" to "ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer" to "$mainUrl/",
+        "Cache-Control" to "no-cache",
+        "Pragma" to "no-cache",
+        "Upgrade-Insecure-Requests" to "1",
+        "Sec-Fetch-Dest" to "document",
+        "Sec-Fetch-Mode" to "navigate",
+        "Sec-Fetch-Site" to "same-origin"
     )
+
+    // The site redirects the bare host to www. Try both entry hosts because
+    // some Android network stacks cache or mishandle the canonical redirect.
+    private fun alternateHostUrl(url: String): String =
+        url.replaceFirst("https://www.faselhd.cc", "https://faselhd.cc")
+
+    private suspend fun fetchCatalogPage(url: String): String {
+        val candidates = listOf(url, alternateHostUrl(url)).distinct()
+        var lastError: Exception? = null
+        for (candidate in candidates) {
+            try {
+                val html = app.get(
+                    candidate,
+                    headers = webHeaders + mapOf("Referer" to "$mainUrl/")
+                ).text
+                if (html.contains("postDiv") || html.contains("slideContent") || html.contains("id=\"postList\"")) {
+                    return html
+                }
+                // A challenge/error page is not a valid empty catalog.
+                lastError = IllegalStateException("FaselHD returned an unrecognized page for $candidate")
+            } catch (error: Exception) {
+                lastError = error
+            }
+        }
+        throw lastError ?: IllegalStateException("Unable to load FaselHD catalog: $url")
+    }
 
     // Use only real catalog pages that contain series/movie cards.
     // The "recent" feeds are episode pages, not series listings, so they
@@ -66,8 +98,10 @@ class FaselHD : MainAPI() {
         val base = request.data.trimEnd('/')
         val url = if (page <= 1) request.data else "$base/page/$page"
         val html = try {
-            app.get(url, headers = webHeaders).text
-        } catch (_: Exception) {
+            fetchCatalogPage(url)
+        } catch (error: Exception) {
+            // Do not disguise transport/challenge failures as a valid empty page.
+            logError(error)
             return newHomePageResponse(request.name, emptyList(), false)
         }
         val document = Jsoup.parse(html, url)
