@@ -74,9 +74,9 @@ jobs:
               "language": "ar",
               "authors": ["elhaoy8474-png"],
               "tvTypes": ["Movie", "TvSeries", "Anime"],
-              "version": 4,
+              "version": 5,
               "internalName": "FaselHD",
-              "description": "FaselHD - أفلام ومسلسلات وأنمي",
+              "description": "FaselHD - Live catalog pages, movies, series and anime",
               "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
               "name": "FaselHD"
           })
