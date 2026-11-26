@@ -153,4 +153,44 @@ class FaselHDParserTest {
         assertEquals("https://www.faselhd.cc/poster.jpg", cards.single().poster)
     }
 
+
+    @Test
+    fun currentCatalogCategoriesParseAllMoviesAndRecentAnimeSeries() {
+        val html = """
+            <div id="postList">
+                <div class="postDiv">
+                    <a href="/anime-movies/toki-wo-kakeru-shoujo">
+                        <img src="/anime-movie.jpg" alt="فيلم Toki wo Kakeru Shoujo">
+                    </a>
+                    <div class="postInner"><div class="h1">فيلم Toki wo Kakeru Shoujo</div></div>
+                </div>
+                <div class="postDiv">
+                    <a href="/recent_asian/nine-to-six">
+                        <img src="/asian.jpg" alt="مسلسل Nine to Six">
+                    </a>
+                    <div class="postInner"><div class="h1">مسلسل Nine to Six</div></div>
+                </div>
+                <div class="postDiv">
+                    <a href="/recent_anime/hunter-x-hunter">
+                        <img src="/anime.jpg" alt="أنمي Hunter x Hunter">
+                    </a>
+                    <div class="postInner"><div class="h1">أنمي Hunter x Hunter</div></div>
+                </div>
+                <div class="postDiv">
+                    <a href="/episodes/show-episode-1">
+                        <img src="/episode.jpg" alt="الحلقة 1">
+                    </a>
+                    <div class="postInner"><div class="h1">الحلقة 1</div></div>
+                </div>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(3, cards.size)
+        assertTrue(cards.any { it.isMovie && it.url.contains("/anime-movies/") })
+        assertTrue(cards.any { !it.isMovie && !it.isAnime && it.url.contains("/recent_asian/") })
+        assertTrue(cards.any { it.isAnime && it.url.contains("/recent_anime/") })
+    }
+
 }
