@@ -193,4 +193,62 @@ class FaselHDParserTest {
         assertTrue(cards.any { it.isAnime && it.url.contains("/recent_anime/") })
     }
 
+
+    @Test
+    fun currentAsianSeriesCardsAreRecognizedAndEpisodeFeedsAreIgnored() {
+        val html = """
+            <div id="postList">
+                <div class="postDiv">
+                    <a href="/asian_seasons/مسلسل-shadow-beauty">
+                        <div class="imgdiv-class">
+                            <img src="/blank.gif" data-src="https://static.faselhdcdn.com/shadow.jpg"
+                                 alt="مسلسل Shadow Beauty">
+                        </div>
+                        <div class="postInner"><div class="h1">مسلسل Shadow Beauty</div></div>
+                    </a>
+                </div>
+                <div class="postDiv">
+                    <a href="/asian-episodes/مسلسل-nine-to-six-الحلقة-1">
+                        <img src="/episode.jpg" alt="مسلسل Nine to Six – الحلقة 1">
+                        <div class="postInner"><div class="h1">مسلسل Nine to Six – الحلقة 1</div></div>
+                    </a>
+                </div>
+                <div class="postDiv">
+                    <a href="/anime-episodes/anime-show-episode-8">
+                        <img src="/anime-episode.jpg" alt="أنمي الحلقة 8">
+                        <div class="postInner"><div class="h1">أنمي الحلقة 8</div></div>
+                    </a>
+                </div>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(1, cards.size)
+        assertTrue(cards.single().url.contains("/asian_seasons/"))
+        assertFalse(cards.single().isMovie)
+        assertFalse(cards.single().isAnime)
+        assertEquals("https://static.faselhdcdn.com/shadow.jpg", cards.single().poster)
+    }
+
+    @Test
+    fun currentEpisodeOnlyFeedsDoNotProduceSeriesCards() {
+        val html = """
+            <div class="postDiv"><a href="/episodes/show-episode-11">
+                <img src="/poster.jpg" alt="Show episode 11">
+                <div class="h1">Show episode 11</div>
+            </a></div>
+            <div class="postDiv"><a href="/asian-episodes/asian-show-episode-1">
+                <img src="/poster2.jpg" alt="Asian show episode 1">
+                <div class="h1">Asian show episode 1</div>
+            </a></div>
+            <div class="postDiv"><a href="/anime-episodes/anime-show-episode-8">
+                <img src="/poster3.jpg" alt="Anime show episode 8">
+                <div class="h1">Anime show episode 8</div>
+            </a></div>
+        """.trimIndent()
+
+        assertTrue(FaselHDParser.parseCards(html, "https://www.faselhd.cc").isEmpty())
+    }
+
 }
