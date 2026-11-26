@@ -15,7 +15,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.json.JSONTokener
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.suspendCoroutine
 import kotlin.coroutines.resume
 
 /**
@@ -29,16 +29,14 @@ internal object FaselHDWebViewVerification {
     var verifiedUserAgent: String? = null
         private set
 
-    suspend fun open(url: String): String? = suspendCancellableCoroutine { continuation ->
+    suspend fun open(url: String): String? = suspendCoroutine { continuation ->
         val activity = currentActivity()
         if (activity == null || activity.isFinishing) {
             continuation.resume(null)
-            return@suspendCancellableCoroutine
+            return@suspendCoroutine
         }
 
         activity.runOnUiThread {
-            if (!continuation.isActive) return@runOnUiThread
-
             val density = activity.resources.displayMetrics.density
             fun dp(value: Int): Int = (value * density).toInt()
 
@@ -77,7 +75,7 @@ internal object FaselHDWebViewVerification {
                         webView.destroy()
                     }
                     if (dialog.isShowing) dialog.dismiss()
-                    if (continuation.isActive) continuation.resume(html)
+                    continuation.resume(html)
                 }
             }
 
@@ -168,10 +166,6 @@ internal object FaselHDWebViewVerification {
             )
             handler.postDelayed(timeout, 240_000L)
             webView.loadUrl(url)
-
-            continuation.invokeOnCancellation {
-                activity.runOnUiThread { complete?.invoke(null) }
-            }
         }
     }
 
