@@ -101,7 +101,7 @@ class FaselHD : MainAPI() {
             fetchCatalogPage(url)
         } catch (error: Exception) {
             // Do not disguise transport/challenge failures as a valid empty page.
-            logError(error)
+            error.printStackTrace()
             return newHomePageResponse(request.name, emptyList(), false)
         }
         val document = Jsoup.parse(html, url)
