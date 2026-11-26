@@ -3,6 +3,6 @@
   "description": "مستودع إضافات CloudStream: QFilm وFaselHD وCimaClub وViu وWeTV وAhwakTV وAlooyTV وغيرها",
   "manifestVersion": 1,
   "pluginLists": [
-    "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/6a8cf325925c81bb4ac395c5497162ca59f4eaa0/plugins-v4.json"
+    "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/0b2d89f698325df3037530478616ba07146bedae/plugins-v4.json"
   ]
 }
