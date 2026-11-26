@@ -1,5 +1,9 @@
 name: Validate Provider Parsers
 
+concurrency:
+  group: faselhd-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
