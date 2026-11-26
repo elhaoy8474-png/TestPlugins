@@ -25,15 +25,19 @@ class FaselHD : MainAPI() {
         "Referer" to "$mainUrl/"
     )
 
+    // /main is only a navigation landing page on the current site and contains
+    // no catalog cards. Point CloudStream sections at actual catalog endpoints.
     override val mainPage = mainPageOf(
-        "$mainUrl/main" to "الرئيسية",
+        "$mainUrl/all-movies" to "جميع الأفلام",
         "$mainUrl/movies" to "أفلام أجنبية",
         "$mainUrl/series" to "مسلسلات أجنبية",
+        "$mainUrl/recent_series" to "أحدث المسلسلات",
         "$mainUrl/asian-movies" to "أفلام آسيوية",
         "$mainUrl/asian-series" to "مسلسلات آسيوية",
-        "$mainUrl/dubbed-movies" to "أفلام مدبلجة",
-        "$mainUrl/hindi" to "أفلام هندية",
-        "$mainUrl/anime" to "أنمي"
+        "$mainUrl/anime" to "أنمي",
+        "$mainUrl/anime-movies" to "أفلام أنمي",
+        "$mainUrl/tvshows" to "برامج",
+        "$mainUrl/recent_tvshows" to "أحدث البرامج"
     )
 
     private fun absoluteUrl(raw: String): String =
