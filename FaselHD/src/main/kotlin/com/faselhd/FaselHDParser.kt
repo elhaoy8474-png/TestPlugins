@@ -94,10 +94,12 @@ internal object FaselHDParser {
         // a sibling of the image link, not a descendant of the anchor itself.
         // Parse the whole card first, then fall back to generic linked cards.
         val postCards = document.select(".postDiv")
-        // Prefer the current card wrapper, but also inspect supported content
-        // anchors. Some search responses omit the wrapper class for a subset
-        // of results; the URL-keyed map below safely removes duplicates.
-        val candidates: List<Element> = postCards + document.select(
+        // The live /main landing page uses featured swiper slides instead of
+        // .postDiv cards. Their title and poster live together in .slideContent.
+        val featuredCards = document.select(".slideContent")
+        // Prefer complete card wrappers, then fall back to supported content
+        // anchors. The URL-keyed map safely removes duplicate links.
+        val candidates: List<Element> = postCards + featuredCards + document.select(
             "#postList a[href], .postDiv a[href], a[href*='/movies/'], " +
                 "a[href*='/anime/'], a[href*='/series/'], a[href*='/seasons/'], " +
                 "a[href*='/asian-movies/'], a[href*='/asian-series/'], " +
