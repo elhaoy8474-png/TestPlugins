@@ -1,6 +1,5 @@
 package com.faselhd
 
-import android.webkit.CookieManager
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
@@ -12,7 +11,7 @@ class FaselHD : MainAPI() {
     override var name = "FaselHD"
     override var lang = "ar"
     override val hasMainPage = true
-    override val usesWebView = true
+    override val usesWebView = false
     override val hasQuickSearch = true
     override val hasDownloadSupport = false
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime)
@@ -33,58 +32,29 @@ class FaselHD : MainAPI() {
         "Sec-Fetch-Site" to "same-origin"
     )
 
-    private fun requestHeaders(
-        url: String,
-        extraHeaders: Map<String, String> = emptyMap()
-    ): Map<String, String> {
-        val headers = webHeaders.toMutableMap()
-        headers.putAll(extraHeaders)
-        headers["User-Agent"] =
-            FaselHDWebViewVerification.verifiedUserAgent ?: headers["User-Agent"] ?: desktopUa
-
-        // WebView and OkHttp do not share cookies automatically. Forward only
-        // cookies applicable to this URL after the user completes the site check.
-        val cookies = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull()
-        if (!cookies.isNullOrBlank()) headers["Cookie"] = cookies
-        return headers
-    }
-
-    private fun isMediaRequest(url: String): Boolean {
-        val path = runCatching { URI(url).path.orEmpty().lowercase() }.getOrDefault(url.lowercase())
-        return listOf(".m3u8", ".mp4", ".vtt", ".srt", ".mpd").any { path.endsWith(it) }
-    }
-
     private suspend fun fetchText(
         url: String,
-        extraHeaders: Map<String, String> = emptyMap(),
-        allowUserVerification: Boolean = true
+        extraHeaders: Map<String, String> = emptyMap()
     ): String {
+        val host = runCatching { URI(url).host.orEmpty() }.getOrDefault("unknown")
         val response = try {
-            app.get(
-                url,
-                headers = requestHeaders(url, extraHeaders),
-                allowRedirects = true
-            )
+            app.get(url, headers = webHeaders + extraHeaders, allowRedirects = true)
         } catch (error: Exception) {
-            val message = (error.message.orEmpty() + " " + error.cause?.message.orEmpty()).lowercase()
-            val mayBeChallenge = listOf("403", "503", "forbidden", "cloudflare", "challenge")
-                .any { message.contains(it) }
-            if (!allowUserVerification || !mayBeChallenge) throw error
-
-            val verifiedHtml = FaselHDWebViewVerification.open(url)
-                ?: throw IllegalStateException(
-                    "FaselHD requires a visible security check. Complete it inside KodaStream and retry.",
+            val detail = error.message.orEmpty()
+            val looksBlocked = detail.contains("403") || detail.contains("503") ||
+                detail.contains("Cloudflare", ignoreCase = true)
+            if (looksBlocked) {
+                throw IllegalStateException(
+                    "FaselHD denied the direct app request ($host). The provider does not open a verification window.",
                     error
                 )
-            if (FaselHDParser.isChallengePage(verifiedHtml)) {
-                throw IllegalStateException("FaselHD security verification was not completed.")
             }
-            return verifiedHtml
+            throw error
         }
 
         val html = response.text
-        val challenge = FaselHDParser.isChallengePage(html) || response.code == 403 || response.code == 503
-        val host = runCatching { URI(url).host.orEmpty() }.getOrDefault("unknown")
+        val challenge = FaselHDParser.isChallengePage(html) ||
+            response.code == 403 || response.code == 503
         println(
             "FaselHD request: status=" + response.code +
                 ", host=" + host +
@@ -93,19 +63,10 @@ class FaselHD : MainAPI() {
         )
 
         if (challenge) {
-            if (!allowUserVerification) {
-                throw IllegalStateException("FaselHD returned a protected response for a media request.")
-            }
-            val verifiedHtml = FaselHDWebViewVerification.open(url)
-                ?: throw IllegalStateException(
-                    "FaselHD security check was canceled or no active KodaStream screen was available."
-                )
-            if (FaselHDParser.isChallengePage(verifiedHtml)) {
-                throw IllegalStateException("FaselHD security verification is still active.")
-            }
-            return verifiedHtml
+            throw IllegalStateException(
+                "FaselHD returned a Cloudflare security challenge to the native provider request."
+            )
         }
-
         if (response.code !in 200..299) {
             throw IllegalStateException("FaselHD returned HTTP " + response.code + " from " + host)
         }
@@ -185,26 +146,17 @@ class FaselHD : MainAPI() {
         // action when the normal ?s= page has no result cards.
         return try {
             val ajaxUrl = "$mainUrl/wp-admin/admin-ajax.php"
-            val ajaxHeaders = requestHeaders(ajaxUrl, mapOf("Referer" to url))
-            var ajaxHtml = app.post(
+            val ajaxResponse = app.post(
                 ajaxUrl,
-                headers = ajaxHeaders,
+                headers = webHeaders + mapOf("Referer" to url),
                 data = mapOf("action" to "dtc_live", "trsearch" to query)
-            ).text
-            if (FaselHDParser.isChallengePage(ajaxHtml)) {
-                val verified = FaselHDWebViewVerification.open(url)
-                    ?: throw IllegalStateException("FaselHD search requires user verification.")
-                if (FaselHDParser.isChallengePage(verified)) {
-                    throw IllegalStateException("FaselHD search verification is still active.")
-                }
-                ajaxHtml = app.post(
-                    ajaxUrl,
-                    headers = requestHeaders(ajaxUrl, mapOf("Referer" to url)),
-                    data = mapOf("action" to "dtc_live", "trsearch" to query)
-                ).text
-            }
-            if (FaselHDParser.isChallengePage(ajaxHtml)) {
-                throw IllegalStateException("FaselHD search returned a security challenge.")
+            )
+            val ajaxHtml = ajaxResponse.text
+            if (ajaxResponse.code !in 200..299 || FaselHDParser.isChallengePage(ajaxHtml)) {
+                throw IllegalStateException(
+                    "FaselHD live search did not return public search results (HTTP " +
+                        ajaxResponse.code + ")."
+                )
             }
             parseCards(ajaxHtml, url)
         } catch (error: Exception) {
@@ -315,7 +267,7 @@ class FaselHD : MainAPI() {
     ): Boolean {
         val playback = FaselHDPlayback(
             mainUrl, name, desktopUa, webHeaders,
-            fetch = { url, headers -> fetchText(url, headers, allowUserVerification = !isMediaRequest(url)) },
+            fetch = { url, headers -> fetchText(url, headers) },
             externalLoad = { url, referer, subtitles, links ->
                 loadExtractor(url, referer, subtitles, links)
             }

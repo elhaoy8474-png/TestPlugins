@@ -378,4 +378,17 @@ class FaselHDParserTest {
         assertEquals(0, FaselHDParser.parseCards(challenge, "https://www.faselhd.cc").size)
     }
 
+
+    @Test
+    fun nativeProviderDoesNotTreatChallengeHtmlAsCatalog() {
+        val challenge = """
+            <html><head><title>Just a moment...</title></head>
+            <body><div id="cf-challenge-running">Checking your browser</div>
+            <script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script></body></html>
+        """.trimIndent()
+
+        assertTrue(FaselHDParser.isChallengePage(challenge))
+        assertTrue(FaselHDParser.parseCards(challenge, "https://www.faselhd.cc/main").isEmpty())
+    }
+
 }
