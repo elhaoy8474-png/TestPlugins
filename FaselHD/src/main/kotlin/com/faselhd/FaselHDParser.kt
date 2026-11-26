@@ -61,7 +61,11 @@ internal object FaselHDParser {
 
     private fun classify(path: String): Pair<Boolean, Boolean>? {
         val normalized = path.lowercase()
-        if (normalized.startsWith("/episodes/") || normalized.startsWith("/asian-episodes/")) return null
+        // Episode feeds are not series catalog entries. Anime has its own
+        // episode route family on the live site.
+        if (normalized.startsWith("/episodes/") ||
+            normalized.startsWith("/asian-episodes/") ||
+            normalized.startsWith("/anime-episodes/")) return null
         if (normalized.startsWith("/movies/") ||
             normalized.startsWith("/all-movies/") ||
             normalized.startsWith("/asian-movies/") ||
@@ -72,6 +76,7 @@ internal object FaselHDParser {
             normalized.startsWith("/recent_anime/")) return false to true
         if (normalized.startsWith("/series/") ||
             normalized.startsWith("/seasons/") ||
+            normalized.startsWith("/asian_seasons/") ||
             normalized.startsWith("/asian-series/") ||
             normalized.startsWith("/recent_asian/") ||
             normalized.startsWith("/tvshows/") ||
@@ -95,7 +100,8 @@ internal object FaselHDParser {
         val candidates: List<Element> = postCards + document.select(
             "#postList a[href], .postDiv a[href], a[href*='/movies/'], " +
                 "a[href*='/anime/'], a[href*='/series/'], a[href*='/seasons/'], " +
-                "a[href*='/asian-movies/'], a[href*='/asian-series/'], a[href*='/tvshows/']"
+                "a[href*='/asian-movies/'], a[href*='/asian-series/'], " +
+                "a[href*='/asian_seasons/'], a[href*='/anime-movies/'], a[href*='/tvshows/']"
         )
 
         candidates.forEach { candidate ->
@@ -199,7 +205,9 @@ internal object FaselHDParser {
             val rawUrl = anchor.attr("href").trim()
             if (rawUrl.isBlank()) return@forEach
             val url = absoluteUrl(baseUrl, rawUrl).substringBefore("#")
-            if (!url.contains("/episodes/") && !url.contains("/asian-episodes/")) return@forEach
+            if (!url.contains("/episodes/") &&
+                !url.contains("/asian-episodes/") &&
+                !url.contains("/anime-episodes/")) return@forEach
             val title = anchor.text().trim().ifBlank { "الحلقة" }
             val number = episodeNumber(title) ?: episodeNumber(url.substringAfterLast("/")) ?: return@forEach
             episodes.putIfAbsent(url, EpisodeItem(title, url, number))
