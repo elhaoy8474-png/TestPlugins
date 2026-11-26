@@ -103,28 +103,6 @@
         "name": "WeTV"
     },
     {
-        "iconUrl": "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png",
-        "fileHash": "sha256-97e2c50e661eccb47dad526be2a5abeb042824ac50ea5543ed4ca5220da79cf2",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 38698,
-        "status": 3,
-        "language": "ar",
-        "authors": [
-            "elhaoy8474-png"
-        ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries",
-            "Anime"
-        ],
-        "version": 4,
-        "internalName": "FaselHD",
-        "description": "FaselHD - أفلام ومسلسلات وأنمي مع صفحات عربية",
-        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
-        "name": "FaselHD"
-    },
-    {
         "iconUrl": "https://as.alooytv16.com/uploads/system_logo/favicon.ico",
         "fileHash": "sha256-4614fbe6a5295d9af8b03a6326e57ebac8b1dbc4e18e9357e610983ea81ec214",
         "apiVersion": 1,
@@ -185,5 +163,27 @@
         "description": "YouTube search and public video playback with available captions",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/d600fad76a6b4f4754e232d7678b4ff0db1a0ead/YouTube.cs3",
         "name": "YouTube"
+    },
+    {
+        "iconUrl": "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png",
+        "fileHash": "sha256-20a0cad7779d396f8c2f3f49d80a1c55d40dcfad1d240226e4b28f9a85278a1e",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
+        "fileSize": 38695,
+        "status": 3,
+        "language": "ar",
+        "authors": [
+            "elhaoy8474-png"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 4,
+        "internalName": "FaselHD",
+        "description": "FaselHD - أفلام ومسلسلات وأنمي",
+        "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
+        "name": "FaselHD"
     }
 ]
