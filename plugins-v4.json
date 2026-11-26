@@ -180,9 +180,9 @@
             "TvSeries",
             "Anime"
         ],
-        "version": 5,
+        "version": 6,
         "internalName": "FaselHD",
-        "description": "FaselHD - Live catalog pages, movies, series and anime",
+        "description": "FaselHD v6 - live catalog and episode route compatibility",
         "url": "https://raw.githubusercontent.com/elhaoy8474-png/TestPlugins/builds/FaselHD.cs3",
         "name": "FaselHD"
     }
