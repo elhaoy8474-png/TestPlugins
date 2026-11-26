@@ -199,7 +199,7 @@ class FaselHDParserTest {
         val html = """
             <div id="postList">
                 <div class="postDiv">
-                    <a href="/asian_seasons/مسلسل-shadow-beauty">
+                    <a href="/asian_seasons/%D9%85%D8%B3%D9%84%D8%B3%D9%84-shadow-beauty">
                         <div class="imgdiv-class">
                             <img src="/blank.gif" data-src="https://static.faselhdcdn.com/shadow.jpg"
                                  alt="مسلسل Shadow Beauty">
