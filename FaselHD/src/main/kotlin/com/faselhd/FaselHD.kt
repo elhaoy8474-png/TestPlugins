@@ -29,6 +29,7 @@ class FaselHD : MainAPI() {
     // The "recent" feeds are episode pages, not series listings, so they
     // intentionally stay out of the home catalog.
     override val mainPage = mainPageOf(
+        "$mainUrl/main" to "أحدث المحتوى",
         "$mainUrl/movies" to "أفلام أجنبية",
         "$mainUrl/dubbed-movies" to "أفلام مدبلجة",
         "$mainUrl/hindi" to "أفلام هندية",
