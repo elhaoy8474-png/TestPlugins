@@ -285,4 +285,31 @@ class FaselHDParserTest {
         assertTrue(episodes.all { it.url.contains("/anime-episodes/") })
     }
 
+
+    @Test
+    fun currentMainPageFeaturedSlidesParseTitlePosterAndMovieRoute() {
+        val html = """
+            <div class="swiper-slide">
+                <div class="slideInner">
+                    <div class="slideContent">
+                        <div class="poster">
+                            <img src="https://static.faselhdcdn.com/wicker.jpg" alt="">
+                        </div>
+                        <div class="h1 mb-1">
+                            <a href="https://www.faselhd.cc/movies/wicker-2026">فيلم Wicker 2026 مترجم</a>
+                        </div>
+                        <a href="https://www.faselhd.cc/movies/wicker-2026" class="btn">شاهد الآن</a>
+                    </div>
+                </div>
+            </div>
+        """.trimIndent()
+
+        val cards = FaselHDParser.parseCards(html, "https://www.faselhd.cc")
+
+        assertEquals(1, cards.size)
+        assertEquals("فيلم Wicker 2026 مترجم", cards.single().title)
+        assertEquals("https://static.faselhdcdn.com/wicker.jpg", cards.single().poster)
+        assertTrue(cards.single().isMovie)
+    }
+
 }
