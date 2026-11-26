@@ -63,14 +63,17 @@ internal object FaselHDParser {
         val normalized = path.lowercase()
         if (normalized.startsWith("/episodes/") || normalized.startsWith("/asian-episodes/")) return null
         if (normalized.startsWith("/movies/") ||
+            normalized.startsWith("/all-movies/") ||
             normalized.startsWith("/asian-movies/") ||
             normalized.startsWith("/anime-movies/") ||
             normalized.startsWith("/dubbed-movies/") ||
             normalized.startsWith("/hindi/")) return true to false
-        if (normalized.startsWith("/anime/")) return false to true
+        if (normalized.startsWith("/anime/") ||
+            normalized.startsWith("/recent_anime/")) return false to true
         if (normalized.startsWith("/series/") ||
             normalized.startsWith("/seasons/") ||
             normalized.startsWith("/asian-series/") ||
+            normalized.startsWith("/recent_asian/") ||
             normalized.startsWith("/tvshows/") ||
             normalized.startsWith("/recent_series/") ||
             normalized.startsWith("/recent_tvshows/") ||
