@@ -166,10 +166,10 @@
     },
     {
         "iconUrl": "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png",
-        "fileHash": "sha256-388e5759c2d0eb1522d251e358938ee53cbf016f9480a4080f9769fb106b5e87",
+        "fileHash": "sha256-d7724ac478bf96d6ffa7f71e76224e9e7930a41fb3d2ec8e868a4c002c50655a",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/elhaoy8474-png/TestPlugins",
-        "fileSize": 38814,
+        "fileSize": 38841,
         "status": 3,
         "language": "ar",
         "authors": [
