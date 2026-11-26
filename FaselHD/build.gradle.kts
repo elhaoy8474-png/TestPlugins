@@ -1,9 +1,9 @@
-version = 6
+version = 7
 
 cloudstream {
     language = "ar"
     authors = listOf("elhaoy8474-png")
-    description = "FaselHD - Live catalog pages, movies, series and anime"
+    description = "FaselHD v7 - hardened live requests and canonical host fallback"
     status = 3
     tvTypes = listOf("Movie", "TvSeries", "Anime")
     iconUrl = "https://static.faselhdcdn.com/wp-content/uploads/2022/06/logo-1.png"
